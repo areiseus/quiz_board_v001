@@ -1,6 +1,7 @@
 {
   "name": "quiz-board",
   "version": "1.0.0",
+  "main": "env/quiz_server.js",
   "scripts": {
     "start": "node env/quiz_server.js"
   },
@@ -10,11 +11,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "multer": "^1.4.5-lts.1"
+  },
+  "engines": {
+    "node": "18.x"
   }
-  {
-  "version": 2,
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/env/quiz_server.js" }
-  ]
-}
 }
