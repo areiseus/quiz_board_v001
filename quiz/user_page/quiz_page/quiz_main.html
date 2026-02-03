@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>퀴즈 진행</title>
+    <link rel="stylesheet" href="quiz_style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="home-btn" onclick="goHome()">🏠 목록으로</button>
+            <span id="quiz-progress">Q. 1 / -</span>
+        </div>
+
+        <div class="question-box">
+            <h1 id="question-text">문제를 불러오는 중...</h1>
+        </div>
+
+        <div id="answer-box" class="answer-box hidden">
+            <span class="answer-label">정답</span>
+            <h2 id="answer-text">???</h2>
+        </div>
+
+        <div class="controls">
+            <button id="show-answer-btn" onclick="showAnswer()">정답 보기</button>
+            <button id="next-btn" onclick="nextQuestion()" style="display: none;">다음 문제 ➡️</button>
+        </div>
+    </div>
+
+    <script src="quiz_main.js"></script>
+</body>
+</html>

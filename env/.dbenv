@@ -1,0 +1,7 @@
+# 서버가 실행될 포트 번호 (기본 3000)
+PORT=3000
+
+# Supabase 데이터베이스 접속 주소 (여기를 수정하세요!)
+# 형식: postgres://[유저명]:[비밀번호]@[호스트주소]:[포트]/postgres
+# DATABASE_URL="postgres://postgres.xxxx:비밀번호@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
+DATABASE_URL="postgresql://postgres:GmLw5xioDCX9vmCp@db.zxrqmhleptorukpltwpo.supabase.co:5432/postgres"

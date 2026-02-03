@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>퀴즈 관리자 페이지</title>
+    <link rel="stylesheet" href="admin_style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🛠️ 퀴즈 생성 관리자</h1>
+        
+        <div class="form-group">
+            <label>1. 퀴즈 기본 정보</label>
+            <input type="text" id="title" placeholder="퀴즈 제목 (예: 1회차 상식 퀴즈)">
+            <input type="text" id="creator" placeholder="제작자 / 출처">
+            <input type="text" id="dbName" placeholder="DB명 (영어 소문자, 숫자, _ 만 사용! 예: quiz_set_01)">
+            <input type="text" id="description" placeholder="퀴즈에 대한 간단한 설명" style="width: 100%; margin-top: 5px;">
+        </div>
+
+        <div class="form-group">
+            <label>2. 썸네일 이미지 첨부</label>
+            <input type="file" id="thumbnail" accept="image/*">
+            <p class="tip">※ 이미지는 퀴즈 선택 화면에 표시됩니다.</p>
+        </div>
+
+        <div class="form-group">
+            <label>3. 문제 입력 (형식: 문제 | 정답)</label>
+            <textarea id="content" placeholder="예시)&#13;&#10;사과는 영어로? | Apple&#13;&#10;1+1은? | 2&#13;&#10;..."></textarea>
+            <p class="tip">※ 한 줄에 한 문제씩, 파이프 기호(|)로 문제와 정답을 구분하세요.</p>
+        </div>
+
+        <button class="save-btn" onclick="uploadQuiz()">💾 DB 생성 및 저장하기</button>
+        <div id="status"></div>
+    </div>
+
+    <script src="admin_main.js"></script>
+</body>
+</html>
