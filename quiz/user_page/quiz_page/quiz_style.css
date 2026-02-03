@@ -1,0 +1,101 @@
+body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background-color: #1a1a1a;
+    color: white;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    text-align: center;
+}
+
+.container {
+    width: 90%;
+    max-width: 1000px;
+    background: #2a2a2a;
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    font-size: 1.2rem;
+    color: #aaa;
+}
+
+.home-btn {
+    background: none;
+    border: 1px solid #555;
+    color: #aaa;
+    padding: 5px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+}
+.home-btn:hover { background: #444; color: white; }
+
+.question-box {
+    margin-bottom: 40px;
+    min-height: 150px; /* 문제가 짧아도 높이 유지 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#question-text {
+    font-size: 2.5rem; /* 문제 폰트 크게 */
+    word-break: keep-all;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.answer-box {
+    background-color: #007bff;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+    transition: all 0.3s;
+}
+
+.answer-box.hidden {
+    background-color: #333; /* 정답 숨김 상태 */
+    color: #333;
+}
+
+.answer-label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+    opacity: 0.8;
+}
+
+#answer-text {
+    font-size: 2rem;
+    margin: 0;
+}
+
+/* 정답이 숨겨져 있을 때 텍스트도 안 보이게 */
+.answer-box.hidden #answer-text, 
+.answer-box.hidden .answer-label {
+    visibility: hidden; 
+}
+
+.controls button {
+    padding: 15px 40px;
+    font-size: 1.5rem;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.2s;
+}
+
+#show-answer-btn { background-color: #ffc107; color: #333; }
+#next-btn { background-color: #28a745; color: white; }
+
+.controls button:hover { transform: scale(1.05); }
+.controls button:active { transform: scale(0.95); }
