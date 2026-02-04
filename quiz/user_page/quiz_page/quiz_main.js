@@ -17,49 +17,55 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // HTML 요소에 정보 넣기
+    // HTML 요소 연결
     const introTitle = document.getElementById('intro-title');
     const introCreator = document.getElementById('intro-creator');
-    if(introTitle) introTitle.innerText = title;
-    if(introCreator) introCreator.innerText = `Created by ${creator}`;
+    if (introTitle) introTitle.innerText = title;
+    if (introCreator) introCreator.innerText = `Created by ${creator}`;
     
     const startBtn = document.querySelector('.btn-start');
     const loadStatus = document.getElementById('loading-status');
-    if(startBtn) startBtn.disabled = true;
+    if (startBtn) startBtn.disabled = true;
 
     try {
-        // 아까 고친 서버 API 경로와 일치함 (/api/admin_api/...)
+        // [서버 연결] 경로 확인 완료 (/api/admin_api/get-quiz-detail)
         const res = await fetch(`/api/admin_api/get-quiz-detail?dbName=${dbName}`);
-        if (!res.ok) throw new Error("문제 로드 실패");
+        
+        if (!res.ok) {
+            // 에러 발생 시 텍스트 확인 (HTML 에러 페이지인지 JSON인지)
+            const errText = await res.text();
+            throw new Error(`서버 응답 오류 (${res.status}): ${errText.substring(0, 50)}...`);
+        }
         
         quizData = await res.json();
         
         if (!quizData || quizData.length === 0) {
-            alert("문제가 없습니다.");
+            alert("불러올 문제가 없습니다.");
             location.href = '../select_page/user_main.html';
             return;
         }
 
         isDataLoaded = true;
-        if(startBtn) {
+        if (startBtn) {
             startBtn.disabled = false;
             startBtn.innerHTML = "도전하기! 🚀";
         }
-        if(loadStatus) {
+        if (loadStatus) {
             loadStatus.innerText = "로딩 완료! 준비되셨나요?";
             loadStatus.style.color = "#28a745";
         }
 
     } catch (err) {
-        alert("오류: " + err.message);
-        if(loadStatus) {
+        console.error(err);
+        if (loadStatus) {
             loadStatus.innerText = "로딩 실패";
             loadStatus.style.color = "red";
         }
+        alert("퀴즈 로딩 중 오류가 발생했습니다: " + err.message);
     }
 
     const answerInput = document.getElementById('answer-input');
-    if(answerInput) {
+    if (answerInput) {
         answerInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') checkAnswer();
         });
@@ -72,8 +78,8 @@ function startQuiz() {
     const introLayer = document.getElementById('intro-layer');
     const quizLayer = document.getElementById('quiz-layer');
     
-    if(introLayer) introLayer.style.display = 'none';
-    if(quizLayer) quizLayer.style.display = 'flex';
+    if (introLayer) introLayer.style.display = 'none';
+    if (quizLayer) quizLayer.style.display = 'flex';
     
     renderQuestion();
 }
@@ -95,16 +101,14 @@ function renderQuestion() {
     document.getElementById('user-answer-display').style.display = 'none'; 
     document.getElementById('btn-next').style.display = 'none';
     
-    // 진행바 및 텍스트
     const percent = ((currentIndex) / quizData.length) * 100;
     document.getElementById('progress').style.width = `${percent}%`;
     document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
     document.getElementById('q-text').innerText = q.question || "내용 없음"; 
     
-    // 입력창 설정
     const input = document.getElementById('answer-input');
     
-    // placeholder에 '완전 일치' 여부 힌트 추가
+    // placeholder 설정
     let placeholderText = "정답 입력";
     if (q.is_strict) {
         placeholderText = "정답 입력 (★정확히 입력하세요)";
@@ -114,7 +118,7 @@ function renderQuestion() {
     }
     input.placeholder = placeholderText;
 
-    // 미디어 처리 (유튜브, 비디오, 이미지)
+    // 미디어 처리 (유튜브/비디오/이미지)
     const mediaArea = document.getElementById('media-area');
     mediaArea.innerHTML = ''; 
 
@@ -137,6 +141,7 @@ function renderQuestion() {
             mediaArea.innerHTML = `<img src="${url}" alt="문제 이미지" onerror="this.style.display='none'">`;
         }
     } else if (q.image_data) {
+        // 서버에서 받아온 base64 이미지
         mediaArea.innerHTML = `<img src="${q.image_data}" alt="문제 이미지">`;
     }
 
@@ -147,22 +152,20 @@ function renderQuestion() {
     startTimer();
 }
 
-// 유튜브 ID 추출 유틸
 function getYouTubeId(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
 }
 
-// 타이머
 function startTimer() {
     let timeLeft = TIME_LIMIT;
     const timerElement = document.getElementById('timer-sec');
-    timerElement.innerText = timeLeft;
+    if(timerElement) timerElement.innerText = timeLeft;
 
     timerInterval = setInterval(() => {
         timeLeft--;
-        timerElement.innerText = timeLeft;
+        if(timerElement) timerElement.innerText = timeLeft;
 
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
@@ -186,7 +189,6 @@ function handleTimeOut() {
     showResultOverlay(false, 0, userValue, true);
 }
 
-// 정답 정제 (특수문자 제거 등)
 function cleanString(str) {
     if (!str) return "";
     return str.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/정답[:\s]*/g, '').replace(/[:\s]/g, '').toLowerCase();
@@ -204,8 +206,9 @@ function checkAnswer() {
 
     const q = quizData[currentIndex];
     const requiredCount = parseInt(q.required_count) || 1;
-    const isStrict = q.is_strict; // 완전 일치 모드 여부
+    const isStrict = q.is_strict; 
     
+    // 정답 비교 로직
     const dbAnswers = q.answer.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
     const userInputs = userAns.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
 
@@ -215,10 +218,8 @@ function checkAnswer() {
     uniqueUserInputs.forEach(uInput => {
         const isHit = dbAnswers.some(dbAns => {
             if (isStrict) {
-                // [완전 일치 모드] 정확히 같아야 함 ('집행' == '집행유예' -> False)
                 return dbAns === uInput;
             } else {
-                // [일반 모드] 포함되어 있으면 인정 ('집행' -> '집행유예' 포함 -> True)
                 return dbAns === uInput || (dbAns.includes(uInput) && uInput.length >= 1);
             }
         });
@@ -231,7 +232,6 @@ function checkAnswer() {
     showResultOverlay(isSuccess, matchCount, userAns, false);
 }
 
-// 결과 오버레이 표시
 function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
     stopMediaPlayback();
     const q = quizData[currentIndex];
