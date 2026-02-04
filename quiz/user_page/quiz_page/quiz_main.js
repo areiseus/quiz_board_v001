@@ -68,36 +68,33 @@ function renderQuestion() {
         input.placeholder = "정답 입력";
     }
 
-    // [핵심 수정] 미디어 처리 (이미지 vs 유튜브 vs 비디오)
+    // 미디어 처리 (유튜브, 비디오, 이미지)
     const mediaArea = document.getElementById('media-area');
     mediaArea.innerHTML = ''; // 초기화 (완전 공백)
 
     if (q.image_url && q.image_url.trim() !== '') {
         const url = q.image_url.trim();
-        
-        // 1. 유튜브 링크인지 확인
         const youtubeId = getYouTubeId(url);
+
         if (youtubeId) {
-            // 유튜브는 iframe으로 임베드 (자동재생, 음소거 해제 시도)
+            // 유튜브
             mediaArea.innerHTML = `
                 <iframe src="https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0" 
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                 allowfullscreen></iframe>`;
-        } 
-        // 2. 비디오 파일인지 확인 (.mp4, .webm 등)
-        else if (url.match(/\.(mp4|webm|ogg)$/i)) {
+        } else if (url.match(/\.(mp4|webm|ogg)$/i)) {
+            // 동영상 파일
             mediaArea.innerHTML = `
                 <video controls autoplay name="media">
                     <source src="${url}" type="video/mp4">
                 </video>`;
-        } 
-        // 3. 아니면 이미지로 처리
-        else {
+        } else {
+            // 이미지
             mediaArea.innerHTML = `<img src="${url}" alt="문제 이미지" onerror="this.style.display='none'">`;
         }
 
     } else if (q.image_data) {
-        // 직접 업로드한 이미지 파일
+        // 직접 업로드 이미지
         mediaArea.innerHTML = `<img src="${q.image_data}" alt="문제 이미지">`;
     }
 
@@ -109,7 +106,7 @@ function renderQuestion() {
     startTimer();
 }
 
-// [NEW] 유튜브 ID 추출 함수 (짧은 주소, 긴 주소 모두 대응)
+// 유튜브 ID 추출
 function getYouTubeId(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
@@ -184,11 +181,11 @@ function checkAnswer() {
     showResultOverlay(isSuccess, matchCount, userAns, false);
 }
 
-// 결과 오버레이 함수 (지난번 요청하신 '내 답 표시' + '큰 정답' 유지)
+// [핵심 수정] 결과 오버레이 (부연설명 없으면 박스 제거)
 function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
     const q = quizData[currentIndex];
     const requiredCount = parseInt(q.required_count) || 1;
-    const explanation = q.explanation || "";
+    const explanation = q.explanation ? q.explanation.trim() : "";
     const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim();
 
     const overlay = document.getElementById('result-overlay');
@@ -208,6 +205,16 @@ function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
         bgClass = '#fff3cd'; 
     }
 
+    // 부연설명 HTML 생성 (내용이 있을 때만 박스를 만듦)
+    let explanationHtml = '';
+    if (explanation) {
+        explanationHtml = `
+            <div class="exp-box" style="background:${bgClass};">
+                💡 ${explanation}
+            </div>
+        `;
+    }
+
     content.innerHTML = `
         ${titleHtml}
         <div class="overlay-sub">정답은?</div>
@@ -217,11 +224,10 @@ function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
             (맞춘 개수: ${matchCount} / 필요: ${requiredCount})
         </div>
 
-        <div class="exp-box" style="background:${bgClass};">
-            ${explanation ? "💡 " + explanation : "부연 설명이 없습니다."}
-        </div>
+        ${explanationHtml} 
     `;
 
+    // 하단 처리
     document.getElementById('input-group').style.display = 'none';
     
     const myAnswerBox = document.getElementById('user-answer-display');
