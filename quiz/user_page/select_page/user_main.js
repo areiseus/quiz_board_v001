@@ -7,6 +7,7 @@ async function loadQuizList() {
     
     try {
         const response = await fetch('/api/admin_api/list-quizzes');
+        
         if (!response.ok) throw new Error("서버 연결 실패");
 
         const quizzes = await response.json();
@@ -21,16 +22,18 @@ async function loadQuizList() {
             const card = document.createElement('div');
             card.className = 'quiz-card';
             
+            // 클릭 시 인트로 화면으로 정보 전달
             card.onclick = () => {
-                // [수정] 제목과 제작자 정보를 URL 파라미터로 같이 넘깁니다 (한글 깨짐 방지 위해 encodeURIComponent 사용)
                 const title = encodeURIComponent(quiz.title);
                 const creator = encodeURIComponent(quiz.creator || '관리자');
+                // DB 이름은 링크 생성용으로만 사용하고 화면엔 안 보여줌
                 location.href = `../quiz_page/quiz_main.html?db=${quiz.target_db_name}&title=${title}&creator=${creator}`;
             };
 
             const dateObj = quiz.created_at ? new Date(quiz.created_at) : new Date();
             const dateStr = dateObj.toLocaleDateString();
 
+            // 이미지 처리
             let imageHtml = '';
             if (quiz.thumbnail) {
                 imageHtml = `<img src="${quiz.thumbnail}" style="width:100%; height:100%; object-fit:cover;" alt="표지">`;
@@ -40,14 +43,14 @@ async function loadQuizList() {
                 </div>`;
             }
 
+            // [수정] DB 이름 표시 부분 삭제
             card.innerHTML = `
                 <div style="height:150px; background:#f9f9f9; overflow:hidden;">
                     ${imageHtml}
                 </div>
                 <div class="card-body">
                     <h3 class="card-title">${quiz.title}</h3>
-                    <p class="card-desc">DB: ${quiz.target_db_name}</p>
-                    <div class="card-meta">
+                    <div class="card-meta" style="margin-top:10px;">
                         <span>👤 ${quiz.creator || '관리자'}</span> | 
                         <span>📅 ${dateStr}</span>
                     </div>
