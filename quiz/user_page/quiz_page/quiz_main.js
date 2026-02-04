@@ -51,7 +51,7 @@ function renderQuestion() {
     // UI 초기화
     document.getElementById('result-overlay').style.display = 'none';
     document.getElementById('input-group').style.display = 'flex';
-    document.getElementById('user-answer-display').style.display = 'none'; // 내 답 숨김
+    document.getElementById('user-answer-display').style.display = 'none'; 
     document.getElementById('btn-next').style.display = 'none';
     
     // 진행바 & 텍스트
@@ -68,13 +68,36 @@ function renderQuestion() {
         input.placeholder = "정답 입력";
     }
 
-    // [수정] 미디어 영역 처리: 이미지가 없으면 '완전 공백'
+    // [핵심 수정] 미디어 처리 (이미지 vs 유튜브 vs 비디오)
     const mediaArea = document.getElementById('media-area');
-    mediaArea.innerHTML = ''; // 깨끗하게 비움
+    mediaArea.innerHTML = ''; // 초기화 (완전 공백)
 
     if (q.image_url && q.image_url.trim() !== '') {
-        mediaArea.innerHTML = `<img src="${q.image_url}" alt="문제 이미지">`;
+        const url = q.image_url.trim();
+        
+        // 1. 유튜브 링크인지 확인
+        const youtubeId = getYouTubeId(url);
+        if (youtubeId) {
+            // 유튜브는 iframe으로 임베드 (자동재생, 음소거 해제 시도)
+            mediaArea.innerHTML = `
+                <iframe src="https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen></iframe>`;
+        } 
+        // 2. 비디오 파일인지 확인 (.mp4, .webm 등)
+        else if (url.match(/\.(mp4|webm|ogg)$/i)) {
+            mediaArea.innerHTML = `
+                <video controls autoplay name="media">
+                    <source src="${url}" type="video/mp4">
+                </video>`;
+        } 
+        // 3. 아니면 이미지로 처리
+        else {
+            mediaArea.innerHTML = `<img src="${url}" alt="문제 이미지" onerror="this.style.display='none'">`;
+        }
+
     } else if (q.image_data) {
+        // 직접 업로드한 이미지 파일
         mediaArea.innerHTML = `<img src="${q.image_data}" alt="문제 이미지">`;
     }
 
@@ -84,6 +107,13 @@ function renderQuestion() {
     input.focus();
 
     startTimer();
+}
+
+// [NEW] 유튜브 ID 추출 함수 (짧은 주소, 긴 주소 모두 대응)
+function getYouTubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
 }
 
 function startTimer() {
@@ -107,7 +137,6 @@ function handleTimeOut() {
     const input = document.getElementById('answer-input');
     input.disabled = true; 
     
-    // 시간 초과 시에는 "시간 초과"라고 표시하거나, 입력하다 만 값을 표시
     const userValue = input.value.trim() || "(입력 못함)";
     showResultOverlay(false, 0, userValue, true);
 }
@@ -152,37 +181,33 @@ function checkAnswer() {
     const isSuccess = matchCount >= requiredCount;
     if (isSuccess) score++;
 
-    // 결과 화면 호출 (성공여부, 맞춘개수, 유저입력값)
     showResultOverlay(isSuccess, matchCount, userAns, false);
 }
 
-// [핵심] 결과 오버레이 및 하단 내 답 표시 통합 함수
+// 결과 오버레이 함수 (지난번 요청하신 '내 답 표시' + '큰 정답' 유지)
 function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
     const q = quizData[currentIndex];
     const requiredCount = parseInt(q.required_count) || 1;
     const explanation = q.explanation || "";
-    // 원본 정답 (대괄호만 제거하고 보여줌)
     const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim();
 
     const overlay = document.getElementById('result-overlay');
     const content = document.getElementById('overlay-content');
 
     let titleHtml = '';
-    let subHtml = '';
     let bgClass = '';
 
     if (isTimeout) {
         titleHtml = `<div class="overlay-msg wro-color">⏰ 시간 초과!</div>`;
-        bgClass = '#fff3cd'; // 노란색 배경
+        bgClass = '#fff3cd'; 
     } else if (isSuccess) {
         titleHtml = `<div class="overlay-msg cor-color">⭕ 정답입니다!</div>`;
-        bgClass = '#d4edda'; // 초록색 배경
+        bgClass = '#d4edda'; 
     } else {
         titleHtml = `<div class="overlay-msg wro-color">❌ 틀렸습니다!</div>`;
-        bgClass = '#fff3cd'; // 노란색 배경
+        bgClass = '#fff3cd'; 
     }
 
-    // [수정] 정답을 아주 크게 표시 (.overlay-big-answer)
     content.innerHTML = `
         ${titleHtml}
         <div class="overlay-sub">정답은?</div>
@@ -197,18 +222,16 @@ function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
         </div>
     `;
 
-    // 하단: 입력창 숨기고 -> [내가 쓴 답] + [다음 버튼] 보이기
     document.getElementById('input-group').style.display = 'none';
     
-    // 내가 쓴 답 표시
     const myAnswerBox = document.getElementById('user-answer-display');
     const myAnswerText = document.getElementById('my-answer-text');
     
     myAnswerText.innerText = userAnsText;
     if(isSuccess) {
-        myAnswerText.style.color = '#28a745'; // 내 답이 맞았으면 초록색
+        myAnswerText.style.color = '#28a745'; 
     } else {
-        myAnswerText.style.color = '#dc3545'; // 틀렸으면 빨간색
+        myAnswerText.style.color = '#dc3545'; 
     }
     
     myAnswerBox.style.display = 'flex';
