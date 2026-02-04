@@ -1,6 +1,6 @@
 let parsedQuizData = [];
 
-// 1. 텍스트 파일 읽기 및 미리보기
+// [핵심 기능 1] 텍스트 파일에서 문제와 정답 추출하기
 async function processFile() {
     const fileInput = document.getElementById('quiz-file');
     const file = fileInput.files[0];
@@ -10,28 +10,31 @@ async function processFile() {
         return;
     }
 
+    // 파일을 텍스트로 읽어옴
     const text = await file.text();
     const lines = text.split('\n');
-    parsedQuizData = [];
+    parsedQuizData = []; // 데이터 초기화
 
     const preview = document.getElementById('preview-area');
-    preview.innerHTML = ''; // 초기화
+    preview.innerHTML = ''; // 미리보기창 초기화
 
+    // 한 줄씩 분석 시작
     lines.forEach(line => {
         line = line.trim();
-        if (!line) return;
+        if (!line) return; // 빈 줄 무시
 
-        // 형식: [문제 1] 질문 | 정답
+        // ★ 정규식: "[문제 숫자] 질문 | 정답" 패턴을 찾음
         const match = line.match(/^\[문제\s*(\d+)\]\s*(.+?)\s*\|\s*(.+)$/);
         
         if (match) {
-            const no = match[1];
-            const question = match[2].trim();
-            const answer = match[3].trim();
+            const no = match[1];          // 문제 번호
+            const question = match[2].trim(); // 질문
+            const answer = match[3].trim();   // 정답
             
+            // 추출한 데이터를 배열에 저장
             parsedQuizData.push({ no, question, answer });
 
-            // 미리보기 추가
+            // 화면에 미리보기 출력
             const p = document.createElement('p');
             p.innerHTML = `<b>Q${no}.</b> ${question} <br> <span style="color:blue">A. ${answer}</span>`;
             p.style.borderBottom = "1px solid #eee";
@@ -40,23 +43,25 @@ async function processFile() {
         }
     });
 
+    // 결과 확인
     if (parsedQuizData.length === 0) {
-        preview.innerHTML = "<span style='color:red; font-weight:bold;'>⚠️ 파싱된 문제가 없습니다. 파일 형식을 확인해주세요.<br>예: [문제 1] 질문 | 정답</span>";
+        preview.innerHTML = "<span style='color:red; font-weight:bold;'>⚠️ 파싱 실패: 형식을 확인해주세요.<br>예: [문제 1] 질문 | 정답</span>";
     } else {
         const countInfo = document.createElement('div');
-        countInfo.innerHTML = `<br><b>✅ 총 ${parsedQuizData.length}개 문제 인식됨</b>`;
+        countInfo.innerHTML = `<br><b>✅ 총 ${parsedQuizData.length}개 문제 추출 성공!</b>`;
         preview.prepend(countInfo);
     }
 }
 
-// 2. 서버로 전송 (DB 생성)
+// [핵심 기능 2] 추출한 데이터를 서버로 보내서 DB 생성하기
 async function uploadQuiz() {
-    // 데이터 검증
+    // 1. 추출된 데이터가 있는지 확인
     if (parsedQuizData.length === 0) {
-        alert("먼저 텍스트 파일을 선택하고 미리보기를 확인해주세요.");
+        alert("먼저 텍스트 파일을 선택해서 문제를 추출해야 합니다.");
         return;
     }
 
+    // 2. 입력값 가져오기
     const title = document.getElementById('quiz-title').value.trim();
     const dbName = document.getElementById('db-name').value.trim();
     const creator = document.getElementById('creator-name').value.trim();
@@ -68,15 +73,15 @@ async function uploadQuiz() {
         return;
     }
 
-    // DB명 유효성 검사 (영어 소문자, 숫자, 언더바만 허용)
+    // DB명 유효성 검사
     const dbNameRegex = /^[a-z0-9_]+$/;
     if (!dbNameRegex.test(dbName)) {
-        alert("DB 이름은 '영어 소문자', '숫자', '언더바(_)'만 사용할 수 있습니다. (공백/한글 불가)");
+        alert("DB 이름 오류: 영어 소문자, 숫자, 언더바(_)만 가능합니다.");
         return;
     }
 
     try {
-        // (1) 비밀번호 확인
+        // 3. 비밀번호 확인
         const verifyRes = await fetch('/api/admin_api/verify-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -88,24 +93,26 @@ async function uploadQuiz() {
             return;
         }
 
-        // (2) 데이터 전송 (FormData)
+        // 4. 데이터 전송 (FormData)
         const formData = new FormData();
         formData.append('title', title);
         formData.append('dbName', dbName);
         formData.append('creator', creator);
         formData.append('description', '설명 없음'); 
+        // ★ 추출한 문제 데이터를 JSON 문자열로 변환해서 전송
         formData.append('quizData', JSON.stringify(parsedQuizData));
 
         if (thumbnailInput && thumbnailInput.files[0]) {
             formData.append('thumbnail', thumbnailInput.files[0]);
         }
 
-        // 로딩 표시 (선택사항)
+        // 로딩 표시
         const btn = document.querySelector('button[onclick="uploadQuiz()"]');
         const originalText = btn.innerText;
         btn.innerText = "생성 중...";
         btn.disabled = true;
 
+        // 5. 서버 요청
         const res = await fetch('/api/admin_api/create-quiz', {
             method: 'POST',
             body: formData
@@ -114,20 +121,18 @@ async function uploadQuiz() {
         if (res.ok) {
             const data = await res.json();
             alert(data.message);
-            location.reload(); // 성공 시 새로고침
+            location.reload(); 
         } else {
-            // 에러 처리
             const errText = await res.text();
             try {
                 const errJson = JSON.parse(errText);
                 alert("오류: " + errJson.error);
             } catch (e) {
-                console.error("서버 에러(HTML):", errText);
-                alert("서버 내부 오류가 발생했습니다. (DB 생성 실패)\n이미 존재하는 DB명이거나 서버 로그를 확인하세요.");
+                console.error(errText);
+                alert("서버 오류가 발생했습니다. (DB 이름 중복 등 확인 필요)");
             }
         }
         
-        // 버튼 복구
         btn.innerText = originalText;
         btn.disabled = false;
 
