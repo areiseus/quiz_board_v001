@@ -108,7 +108,6 @@ router.get('/list-quizzes', async (req, res) => {
         const result = await client.query(`
             SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode
             FROM quiz_bundles 
-            WHERE use_pause IS NOT TRUE
             ORDER BY created_at DESC
         `);
 
