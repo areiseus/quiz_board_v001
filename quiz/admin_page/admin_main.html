@@ -3,71 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>퀴즈 관리자 페이지</title>
-    <link rel="stylesheet" href="admin_style.css">
+    <title>퀴즈 풀기</title>
+    <link rel="stylesheet" href="quiz_style.css">
 </head>
 <body>
-    <div class="container">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h1 style="margin:0;">🛠️ 퀴즈 생성 관리자</h1>
-            
-            <div style="display:flex; gap: 10px;">
-                <button onclick="location.href='../user_page/select_page/user_main.html'" style="padding:10px 15px; background-color:#007bff; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-                    🏠 사용자 페이지
-                </button>
 
-                <button onclick="location.href='admin_edit.html'" style="padding:10px 15px; background-color:#28a745; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-                    ✏️ 기존 퀴즈 수정 ➡️
-                </button>
+    <div class="fixed-container">
+        <div class="top-bar">
+            <div class="progress-container">
+                <div class="progress-fill" id="progress"></div>
+            </div>
+            <div class="info-row">
+                <span id="q-num" class="q-num-text">Q. 1 / --</span>
+                <span id="timer-box">⏳ <span id="timer-sec">15</span>초</span>
             </div>
         </div>
         
-        <div class="form-group">
-            <label>1. 퀴즈 기본 정보</label>
-            <input type="text" id="title" placeholder="퀴즈 제목">
-            <input type="text" id="creator" placeholder="제작자">
-            <input type="text" id="dbName" placeholder="DB명 (영어 소문자, 숫자, _)">
-            <input type="text" id="description" placeholder="설명" style="width: 100%; margin-top: 5px;">
+        <div class="question-section">
+            <h1 id="q-text">문제를 불러오는 중...</h1>
         </div>
 
-        <div class="form-group">
-            <label>2. 썸네일 이미지</label>
-            <input type="file" id="thumbnail" accept="image/*">
+        <div class="media-wrapper">
+            <div id="media-area" class="media-placeholder"></div>
+
+            <div id="result-overlay" class="result-overlay" style="display: none;">
+                <div id="overlay-content"></div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label>3. 문제 입력 (편의 기능 탑재)</label>
-            
-            <div style="background: #eef; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-                <span style="font-weight:bold; font-size:0.9rem;">📂 텍스트 파일 불러오기</span>
-                <ul style="margin: 5px 0 0 20px; font-size: 0.8rem; color: #555;">
-                    <li>형식: <b>문제 / 정답</b> (슬래시 구분)</li>
-                    <li>불러오면 자동으로 <b>파이프(|)</b>로 변환됩니다.</li>
-                </ul>
-                <input type="file" id="text-file-input" accept=".txt" style="margin-top:5px;">
+        <div class="bottom-control">
+            <div id="input-group" class="input-group">
+                <input type="text" id="answer-input" placeholder="정답 입력" autocomplete="off">
+                <button class="btn-submit" onclick="checkAnswer()">제출</button>
             </div>
 
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                <span class="tip">※ 직접 입력 시: <b>문제 | 정답</b> 형식</span>
-                <button type="button" onclick="copyPipe()" style="padding:4px 8px; cursor:pointer; background:#eee; border:1px solid #aaa; border-radius:4px; font-size:0.8rem;">
-                    ' | ' 문자 복사하기
-                </button>
+            <div id="user-answer-display" class="user-answer-display" style="display:none;">
+                <span class="ua-label">내가 쓴 답:</span>
+                <span id="my-answer-text" class="ua-text"></span>
             </div>
 
-            <textarea id="content" placeholder="예시)&#13;&#10;사과는? | Apple&#13;&#10;1+1은? | 2"></textarea>
+            <button id="btn-next" class="btn-next" style="display:none;" onclick="goNextQuestion()">
+                다음 문제 ➡️
+            </button>
         </div>
-
-        <button class="save-btn" onclick="uploadQuiz()">💾 DB 생성 및 저장하기</button>
-        <div id="status"></div>
     </div>
 
-    <script src="admin_main.js"></script>
-    <script>
-        function copyPipe() {
-            navigator.clipboard.writeText(" | ").then(() => {
-                alert("' | ' 문자가 복사되었습니다! (Ctrl+V로 붙여넣으세요)");
-            });
-        }
-    </script>
+    <script src="quiz_main.js"></script>
 </body>
 </html>
