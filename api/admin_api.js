@@ -258,7 +258,7 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
 module.exports = router;
 
 // 6. 퀴즈 설정값 가져오기 (이 부분이 없어서 시간이 15초로 고정됐던 것입니다)
-router.get('/get-quiz-settings', async (req, res) => {
+router.get('/get-quiz-quiz_bundles', async (req, res) => {
     const client = getClient();
     const { dbName } = req.query;
     
@@ -284,7 +284,7 @@ router.get('/get-quiz-settings', async (req, res) => {
                 use_time_limit: row.use_time_limit
             });
         } else {
-            res.status(404).json({ error: "Settings not found" });
+            res.status(404).json({ error: "quiz_bundles DB not found" });
         }
     } catch (e) {
         console.error("설정 로드 실패:", e.message);
