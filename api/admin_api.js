@@ -15,7 +15,7 @@ const getClient = () => {
     });
 };
 
-// 1. 관리자 비밀번호 검증
+// 1. 관리자 비밀번호 검증 (원본 유지)
 router.post('/verify-password', (req, res) => {
     const { password } = req.body;
     if (password === process.env.ADMIN_PASSWORD) {
@@ -25,7 +25,7 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 2. 퀴즈 생성 (자가 치유 로직 포함)
+// 2. 퀴즈 생성 (원본 유지)
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     try {
@@ -38,7 +38,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
-        // (1) 메인 테이블 생성 (없으면 생성)
+        // (1) 메인 테이블 생성
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -54,7 +54,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
-        // (2) 퀴즈 묶음 정보 삽입 (실패 시 컬럼 추가 후 재시도)
+        // (2) 퀴즈 묶음 정보 삽입
         const insertQuery = `
             INSERT INTO quiz_bundles 
             (title, target_db_name, creator, description, image_data, image_type, quiz_mode, use_pause)
@@ -65,16 +65,15 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         try {
             await client.query(insertQuery, insertParams);
         } catch (err) {
-            // ★ [핵심] use_pause 컬럼이 없다는 에러가 나면, 알아서 추가하고 재시도
             if (err.message.includes('use_pause')) {
                 await client.query('ALTER TABLE quiz_bundles ADD COLUMN IF NOT EXISTS use_pause boolean DEFAULT false');
-                await client.query(insertQuery, insertParams); // 재시도
+                await client.query(insertQuery, insertParams); 
             } else {
-                throw err; // 다른 에러면 던짐
+                throw err; 
             }
         }
 
-        // (3) 개별 퀴즈 테이블 생성 (기존꺼 있으면 밀어버림 - 안전장치)
+        // (3) 개별 퀴즈 테이블 생성
         await client.query(`DROP TABLE IF EXISTS ${safeDbName}`);
         await client.query(`
             CREATE TABLE ${safeDbName} (
@@ -107,19 +106,17 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK');
         console.error("생성 실패:", error);
-        // JSON으로 에러 응답 (HTML 500 에러 방지)
         res.status(500).json({ error: error.message });
     } finally {
         await client.end();
     }
 });
 
-// 3. 목록 불러오기 (숨김 처리 적용)
+// 3. 목록 불러오기 (원본 유지)
 router.get('/list-quizzes', async (req, res) => {
     const client = getClient();
     try {
         await client.connect();
-        // use_pause가 true인 것은 제외
         const result = await client.query(`
             SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode
             FROM quiz_bundles 
@@ -144,6 +141,118 @@ router.get('/list-quizzes', async (req, res) => {
     }
 });
 
-// ... (나머지 get-quiz-detail, update-quiz 등 기존 코드는 그대로 유지하거나 필요하면 추가) ...
-// (위 코드까지만 덮어씌우셔도 '생성'과 '목록'은 해결됩니다. update-quiz는 이전 답변 참고)
+// ==========================================================
+// ▼ 여기부터 추가됨: 에러 검출용 상세 조회 API & 수정 API ▼
+// ==========================================================
+
+// 4. 상세 내용 가져오기 (디버깅용 로그 포함)
+router.get('/get-quiz-detail', async (req, res) => {
+    const client = getClient();
+    const { dbName } = req.query;
+    
+    // [로그] 요청 들어옴
+    console.log(`[DEBUG] get-quiz-detail 요청: ${dbName}`);
+
+    if(!dbName) {
+        return res.status(400).json({ error: "DB 이름이 없습니다." });
+    }
+
+    try {
+        const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
+        await client.connect();
+        
+        // [로그] 테이블 존재 확인
+        const tableCheck = await client.query(`
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = $1
+            );
+        `, [safeDbName]);
+
+        if (!tableCheck.rows[0].exists) {
+            console.error(`[DEBUG] 테이블 없음: ${safeDbName}`);
+            throw new Error(`DB에 '${safeDbName}' 테이블이 없습니다. 생성 과정을 확인하세요.`);
+        }
+
+        // [로그] 데이터 조회
+        const query = `
+            SELECT id, quiz_no, question, answer, explanation, required_count, is_strict, image_url, image_type, image_data 
+            FROM ${safeDbName} 
+            ORDER BY quiz_no ASC
+        `;
+        const result = await client.query(query);
+        console.log(`[DEBUG] 조회 성공. 데이터 개수: ${result.rows.length}`);
+
+        const questions = result.rows.map(row => {
+            let convertedImage = null;
+            if (row.image_data && row.image_type) {
+                const base64 = Buffer.from(row.image_data).toString('base64');
+                convertedImage = `data:${row.image_type};base64,${base64}`;
+            }
+            return { ...row, image_data: convertedImage };
+        });
+
+        res.json(questions);
+    } catch (error) {
+        console.error("[DEBUG] 조회 중 에러:", error);
+        // ★ 중요: HTML 대신 JSON 에러 반환 (Unexpected token < 해결)
+        res.status(500).json({ error: error.message, stack: error.stack });
+    } finally {
+        await client.end();
+    }
+});
+
+// 5. 업데이트 (수정 기능 필수 포함)
+router.post('/update-quiz', upload.any(), async (req, res) => {
+    const client = getClient();
+    try {
+        const { dbName, quizData } = req.body;
+        const quizzes = JSON.parse(quizData);
+        const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
+
+        await client.connect();
+        await client.query('BEGIN');
+
+        // 대문 이미지 업데이트
+        const thumbnailFile = req.files.find(f => f.fieldname === 'thumbnail');
+        if (thumbnailFile) {
+            await client.query(`
+                UPDATE quiz_bundles 
+                SET image_data = $1, image_type = $2 
+                WHERE target_db_name = $3
+            `, [thumbnailFile.buffer, thumbnailFile.mimetype, safeDbName]);
+        }
+
+        // 개별 문제 업데이트
+        for (const q of quizzes) {
+            const newFile = req.files.find(f => f.fieldname === `file_${q.id}`);
+            const isStrict = (String(q.is_strict) === 'true');
+            const deleteImage = (String(q.delete_image) === 'true');
+
+            let updateQuery = '';
+            let params = [];
+
+            if (deleteImage) {
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=NULL, image_data=NULL, image_type=NULL WHERE id=$6`;
+                params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.id];
+            } else if (newFile) {
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6, image_data=$7, image_type=$8 WHERE id=$9`;
+                params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, newFile.buffer, newFile.mimetype, q.id];
+            } else {
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6 WHERE id=$7`;
+                params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, q.id];
+            }
+            await client.query(updateQuery, params);
+        }
+
+        await client.query('COMMIT');
+        res.json({ message: "✅ 수정 완료!" });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: error.message });
+    } finally {
+        await client.end();
+    }
+});
+
 module.exports = router;
