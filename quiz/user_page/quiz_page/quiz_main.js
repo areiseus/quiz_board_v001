@@ -2,7 +2,11 @@ let quizData = [];
 let currentIndex = 0;
 let score = 0;
 let timerInterval = null;
-const TIME_LIMIT = 15;
+
+// [수정] DB 설정값에 따라 변하는 변수로 변경 (기본값 설정)
+let timeLimit = 15;     // DB의 time_limit 값
+let useTimeLimit = true; // DB의 use_time_limit 값
+
 let isDataLoaded = false; 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -12,82 +16,89 @@ document.addEventListener('DOMContentLoaded', async () => {
     const title = params.get('title') || "퀴즈 제목";
     const creator = params.get('creator') || "알 수 없음";
 
-    // 2. 잘못된 접근 차단
     if (!dbName) {
         alert("잘못된 접근입니다. (DB 정보가 없습니다)");
-        // 파일 구조에 맞게 경로 수정 (필요시)
         location.href = '../select_page/user_main.html';
         return;
     }
 
-    // 3. UI 초기 세팅
+    // UI 초기 세팅
     const introTitle = document.getElementById('intro-title');
     const introCreator = document.getElementById('intro-creator');
     if (introTitle) introTitle.innerText = title;
     if (introCreator) introCreator.innerText = `Created by ${creator}`;
     
-    const startBtn = document.querySelector('.btn-start'); // 클래스명 .btn-start 확인
-    const loadStatus = document.getElementById('loading-status'); // ID loading-status 확인
+    const startBtn = document.querySelector('.btn-start');
+    const loadStatus = document.getElementById('loading-status');
     
-    // 버튼 잠시 비활성화
     if (startBtn) startBtn.disabled = true;
     if (loadStatus) loadStatus.innerText = "로딩 중...";
 
     try {
-        // [핵심] 서버 연결 및 상세 에러 검출 로직
-        const res = await fetch(`/api/admin_api/get-quiz-detail?dbName=${dbName}`);
+        // [1] 문제 데이터 가져오기
+        const qRes = await fetch(`/api/admin_api/get-quiz-detail?dbName=${dbName}`);
         
-        // 서버 에러(HTML 응답 등) 체크
-        if (!res.ok) {
-            const errText = await res.text();
+        // 정밀 에러 검출
+        if (!qRes.ok) {
+            const errText = await qRes.text();
             let finalMsg = "서버 연결 실패";
-            
-            // JSON인지 HTML인지 확인해서 메시지 추출
             try {
                 const jsonErr = JSON.parse(errText);
-                finalMsg = jsonErr.error || jsonErr.message || jsonErr.details || errText;
+                finalMsg = jsonErr.error || jsonErr.message || errText;
             } catch (e) {
-                // HTML 에러인 경우 (예: Unexpected token <)
                 finalMsg = errText.substring(0, 300); 
             }
-
-            // ★ 에러 발생 시 사용자에게 팝업으로 상세 내용 출력
-            alert(`[로딩 에러 발생]\n상태코드: ${res.status}\n내용: ${finalMsg}`);
-            console.error("서버 에러 내용:", errText);
+            alert(`[문제 로딩 실패]\n${finalMsg}`);
             throw new Error(finalMsg);
         }
-        
-        quizData = await res.json();
-        
-        // 데이터 없음 체크
+        quizData = await qRes.json();
+
+        // [2] ★ 설정 데이터(Settings DB) 가져오기 ★
+        // (Settings DB에서 time_limit, use_time_limit 값을 가져옵니다)
+        try {
+            const sRes = await fetch(`/api/admin_api/get-quiz-settings?dbName=${dbName}`);
+            if (sRes.ok) {
+                const settings = await sRes.json();
+                
+                // ★ DB 값 적용 (필드가 존재할 경우에만 덮어쓰기)
+                if (settings.time_limit !== undefined && settings.time_limit !== null) {
+                    timeLimit = parseInt(settings.time_limit);
+                }
+                if (settings.use_time_limit !== undefined && settings.use_time_limit !== null) {
+                    // DB에서 1/0 혹은 true/false로 올 수 있으므로 boolean 변환
+                    useTimeLimit = (settings.use_time_limit === true || settings.use_time_limit === 'true' || settings.use_time_limit === 1);
+                }
+                
+                console.log(`[설정 적용] 시간제한: ${timeLimit}초, 사용여부: ${useTimeLimit}`);
+            }
+        } catch (settingErr) {
+            console.warn("설정 로드 실패 (기본값 사용):", settingErr);
+        }
+
+        // 데이터 검증
         if (!quizData || quizData.length === 0) {
             alert("불러올 문제가 없습니다.");
             location.href = '../select_page/user_main.html';
             return;
         }
 
-        // 로딩 성공 처리
+        // 로딩 완료
         isDataLoaded = true;
         if (startBtn) {
             startBtn.disabled = false;
             startBtn.innerHTML = "도전하기!";
-            // 클릭 이벤트 연결 (HTML에 onclick이 없으면 여기서 연결)
             startBtn.onclick = startQuiz;
         }
-        if (loadStatus) {
-            loadStatus.innerText = ""; // 로딩 문구 삭제
-        }
+        if (loadStatus) loadStatus.innerText = ""; 
 
     } catch (err) {
         console.error(err);
         if (loadStatus) {
-            // 화면에 에러 메시지 표시
             loadStatus.innerText = "로딩 실패: " + err.message;
             loadStatus.style.color = "red";
         }
     }
 
-    // 엔터키 입력 시 정답 제출
     const answerInput = document.getElementById('answer-input');
     if (answerInput) {
         answerInput.addEventListener('keypress', (e) => {
@@ -96,20 +107,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// 퀴즈 시작 (인트로 숨김 -> 퀴즈 보임)
 function startQuiz() {
     if (!isDataLoaded) return;
-    
     const introLayer = document.getElementById('intro-layer');
     const quizLayer = document.getElementById('quiz-layer');
-    
     if (introLayer) introLayer.style.display = 'none';
     if (quizLayer) quizLayer.style.display = 'flex';
-    
     renderQuestion();
 }
 
-// 문제 렌더링
 function renderQuestion() {
     clearInterval(timerInterval);
 
@@ -121,80 +127,75 @@ function renderQuestion() {
     const q = quizData[currentIndex];
     const reqCount = q.required_count ? parseInt(q.required_count) : 1;
     
-    // 화면 요소 초기화
-    const resultOverlay = document.getElementById('result-overlay');
-    const inputGroup = document.getElementById('input-group');
-    const userAnswerDisplay = document.getElementById('user-answer-display');
-    const btnNext = document.getElementById('btn-next');
-
-    if(resultOverlay) resultOverlay.style.display = 'none';
-    if(inputGroup) inputGroup.style.display = 'flex';
-    if(userAnswerDisplay) userAnswerDisplay.style.display = 'none'; 
-    if(btnNext) btnNext.style.display = 'none';
+    // UI 초기화
+    document.getElementById('result-overlay').style.display = 'none';
+    document.getElementById('input-group').style.display = 'flex';
+    document.getElementById('user-answer-display').style.display = 'none'; 
+    document.getElementById('btn-next').style.display = 'none';
     
-    // 진행바 및 텍스트
+    // 진행바
     const percent = ((currentIndex) / quizData.length) * 100;
-    const progress = document.getElementById('progress');
-    const qNum = document.getElementById('q-num');
-    const qText = document.getElementById('q-text');
-
-    if(progress) progress.style.width = `${percent}%`;
-    if(qNum) qNum.innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
-    if(qText) qText.innerText = q.question || "내용 없음"; 
+    document.getElementById('progress').style.width = `${percent}%`;
+    document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
+    document.getElementById('q-text').innerText = q.question || "내용 없음"; 
     
     const input = document.getElementById('answer-input');
     
-    // 힌트 텍스트 설정
+    // 힌트 텍스트
     let placeholderText = "정답 입력";
     if (q.is_strict) placeholderText += " (★정확히 입력)";
     if (reqCount > 1) placeholderText += ` / ${reqCount}개 필요 (쉼표 구분)`;
-    if(input) input.placeholder = placeholderText;
+    input.placeholder = placeholderText;
 
-    // 미디어(유튜브/비디오/이미지) 처리
+    // 미디어 처리
     const mediaArea = document.getElementById('media-area');
     if (mediaArea) {
         mediaArea.innerHTML = ''; 
-
         if (q.image_url && q.image_url.trim() !== '') {
             const url = q.image_url.trim();
             const youtubeId = getYouTubeId(url);
-
             if (youtubeId) {
-                mediaArea.innerHTML = `
-                    <iframe id="yt-player" 
-                    src="https://www.youtube.com/embed/${youtubeId}?autoplay=0&rel=0&enablejsapi=1" 
-                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                    allowfullscreen></iframe>`;
+                mediaArea.innerHTML = `<iframe id="yt-player" src="https://www.youtube.com/embed/${youtubeId}?autoplay=0&rel=0&enablejsapi=1" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
             } else if (url.match(/\.(mp4|webm|ogg)$/i)) {
                 mediaArea.innerHTML = `<video controls name="media"><source src="${url}" type="video/mp4"></video>`;
             } else {
                 mediaArea.innerHTML = `<img src="${url}" alt="문제 이미지" onerror="this.style.display='none'">`;
             }
         } else if (q.image_data) {
-            // 서버에서 받아온 base64 이미지
             mediaArea.innerHTML = `<img src="${q.image_data}" alt="문제 이미지">`;
         }
     }
 
-    if(input) {
-        input.value = '';
-        input.disabled = false;
-        input.focus();
-    }
+    input.value = '';
+    input.disabled = false;
+    input.focus();
 
-    startTimer();
+    // ★ [핵심] use_time_limit 값에 따라 타이머 작동 결정
+    const timerElement = document.getElementById('timer-sec');
+    const timerContainer = timerElement ? timerElement.parentElement : null; // 타이머 감싸는 박스 찾기 (구조에 따라 다름)
+
+    if (useTimeLimit) {
+        // 타이머 사용
+        if (timerContainer) timerContainer.style.display = 'block';
+        if (timerElement) timerElement.style.display = 'inline'; // 혹은 block
+        startTimer();
+    } else {
+        // 타이머 미사용 (숨김)
+        if (timerContainer) timerContainer.style.display = 'none';
+        else if (timerElement) timerElement.style.display = 'none';
+        // startTimer() 호출 안 함 -> 무제한 시간
+    }
 }
 
-// 유튜브 ID 추출
 function getYouTubeId(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
 }
 
-// 타이머 로직
+// [수정] timeLimit 변수 사용
 function startTimer() {
-    let timeLeft = TIME_LIMIT;
+    let timeLeft = timeLimit; 
     const timerElement = document.getElementById('timer-sec');
     if(timerElement) timerElement.innerText = timeLeft;
 
@@ -225,28 +226,32 @@ function handleTimeOut() {
     showResultOverlay(false, 0, userValue, true);
 }
 
-// 문자열 정제
+// 문자열 정제 (공백, 콤마 등 제거)
 function cleanString(str) {
     if (!str) return "";
-    return str.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/정답[:\s]*/g, '').replace(/[:\s]/g, '').toLowerCase();
+    return str.replace(/\[.*?\]/g, '')
+              .replace(/\(.*?\)/g, '')
+              .replace(/정답[:\s]*/g, '')
+              .replace(/[\s,.]/g, '') // 공백, 콤마, 점 제거
+              .toLowerCase();
 }
 
-// [핵심] 정답 체크 로직 (원본 유지)
 function checkAnswer() {
     const input = document.getElementById('answer-input');
     if (!input || input.disabled) return;
-    
     const userAns = input.value.trim();
     if (!userAns) return; 
 
-    clearInterval(timerInterval);
+    // 타이머가 돌고 있었다면 멈춤
+    if (timerInterval) clearInterval(timerInterval);
+    
     input.disabled = true; 
 
     const q = quizData[currentIndex];
     const requiredCount = parseInt(q.required_count) || 1;
     const isStrict = q.is_strict; 
     
-    const dbAnswers = q.answer.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
+    const dbAnswers = q.answer.split('|').map(s => cleanString(s)).filter(s => s.length > 0);
     const userInputs = userAns.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
 
     let matchCount = 0;
@@ -257,7 +262,10 @@ function checkAnswer() {
             if (isStrict) {
                 return dbAns === uInput;
             } else {
-                return dbAns === uInput || (dbAns.includes(uInput) && uInput.length >= 1);
+                // 양방향 포함 체크
+                return (dbAns === uInput) || 
+                       (dbAns.includes(uInput) && uInput.length > 0) || 
+                       (uInput.includes(dbAns) && dbAns.length > 0);
             }
         });
         if (isHit) matchCount++;
@@ -269,35 +277,23 @@ function checkAnswer() {
     showResultOverlay(isSuccess, matchCount, userAns, false);
 }
 
-// 결과 오버레이 표시
 function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
     stopMediaPlayback();
     const q = quizData[currentIndex];
     const requiredCount = parseInt(q.required_count) || 1;
     const explanation = q.explanation ? q.explanation.trim() : "";
-    const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim();
+    
+    // 원본 정답 보여주기 (파이프 -> 콤마로 보기 좋게)
+    const rawCleanAnswer = q.answer.replace(/\|/g, ', ').replace(/\[.*?\]/g, '').trim();
 
     const overlay = document.getElementById('result-overlay');
     const content = document.getElementById('overlay-content');
 
-    let titleHtml = '';
-    let bgClass = '';
-
-    if (isTimeout) {
-        titleHtml = `<div class="overlay-msg wro-color" style="color:#dc3545; font-weight:bold; font-size:1.5rem;">⏰ 시간 초과!</div>`;
-        bgClass = '#fff3cd'; 
-    } else if (isSuccess) {
-        titleHtml = `<div class="overlay-msg cor-color" style="color:#28a745; font-weight:bold; font-size:1.5rem;">⭕ 정답입니다!</div>`;
-        bgClass = '#d4edda'; 
-    } else {
-        titleHtml = `<div class="overlay-msg wro-color" style="color:#dc3545; font-weight:bold; font-size:1.5rem;">❌ 틀렸습니다!</div>`;
-        bgClass = '#fff3cd'; 
-    }
-
-    let explanationHtml = '';
-    if (explanation) {
-        explanationHtml = `<div class="exp-box" style="background:${bgClass}; padding:10px; border-radius:5px; margin-top:10px;">💡 ${explanation}</div>`;
-    }
+    let titleHtml = isTimeout ? `<div class="overlay-msg" style="color:#dc3545">⏰ 시간 초과!</div>` :
+                    isSuccess ? `<div class="overlay-msg" style="color:#28a745">⭕ 정답입니다!</div>` :
+                                `<div class="overlay-msg" style="color:#dc3545">❌ 틀렸습니다!</div>`;
+    let bgClass = isSuccess ? '#d4edda' : '#fff3cd';
+    let explanationHtml = explanation ? `<div class="exp-box" style="background:${bgClass}; padding:10px; margin-top:10px; border-radius:5px;">💡 ${explanation}</div>` : '';
 
     if(content) {
         content.innerHTML = `
@@ -310,9 +306,9 @@ function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
     }
 
     const inputGroup = document.getElementById('input-group');
-    const myAnswerBox = document.getElementById('user-answer-display');
     const myAnswerText = document.getElementById('my-answer-text');
     const btnNext = document.getElementById('btn-next');
+    const myAnswerBox = document.getElementById('user-answer-display');
 
     if(inputGroup) inputGroup.style.display = 'none';
     if(myAnswerText) {
@@ -333,21 +329,11 @@ function goNextQuestion() {
 function showFinalResult() {
     const container = document.querySelector('.fixed-container') || document.body;
     const finalScore = Math.round((score / quizData.length) * 100);
-    
-    // 기존 내용 지우고 결과창 띄우기
     container.innerHTML = `
-        <div style="text-align:center; margin-top:50px; display:flex; flex-direction:column; justify-content:center; height:100%;">
-            <h1 style="font-size:4rem; margin-bottom:10px;">🎉 퀴즈 종료!</h1>
-            <p style="font-size:2rem; color:#666;">모든 문제를 풀었습니다.</p>
-            <div style="margin: 40px 0;">
-                <div style="font-size:8rem; font-weight:900; color:#007bff;">${finalScore}점</div>
-                <div style="font-size:2.5rem; color:#333; font-weight:bold; margin-top:20px;">
-                    (정답 ${score}개 / 전체 ${quizData.length}문제)
-                </div>
-            </div>
-            <button class="btn-next" style="width:300px; margin:0 auto; padding:15px; background:#007bff; color:white; border:none; border-radius:10px; font-size:1.2rem; cursor:pointer;" onclick="location.href='../select_page/user_main.html'">
-                목록으로 돌아가기
-            </button>
-        </div>
-    `;
+        <div style="text-align:center; margin-top:50px;">
+            <h1>🎉 퀴즈 종료!</h1>
+            <div style="font-size:4rem; color:#007bff; margin:20px;">${finalScore}점</div>
+            <p>(정답 ${score}개 / 전체 ${quizData.length}문제)</p>
+            <button onclick="location.href='../select_page/user_main.html'" style="padding:15px; background:#007bff; color:white; border-radius:10px; margin-top:20px;">목록으로</button>
+        </div>`;
 }
