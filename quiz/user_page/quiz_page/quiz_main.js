@@ -3,13 +3,11 @@ let currentIndex = 0;
 let score = 0;
 let timerInterval = null;
 const TIME_LIMIT = 15;
-let isDataLoaded = false; // 데이터 로딩 완료 여부
+let isDataLoaded = false; 
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. URL 파라미터 파싱
     const params = new URLSearchParams(window.location.search);
     const dbName = params.get('db');
-    // user_main.js에서 넘겨준 제목과 제작자를 받음
     const title = params.get('title') || "퀴즈 제목";
     const creator = params.get('creator') || "알 수 없음";
 
@@ -19,16 +17,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // 2. 인트로 화면 세팅
     document.getElementById('intro-title').innerText = title;
     document.getElementById('intro-creator').innerText = `Created by ${creator}`;
     
-    // 시작 버튼 비활성화 (로딩 전까지)
     const startBtn = document.querySelector('.btn-start');
     const loadStatus = document.getElementById('loading-status');
     startBtn.disabled = true;
 
-    // 3. 백그라운드 데이터 로딩
     try {
         const res = await fetch(`/api/admin_api/get-quiz-detail?dbName=${dbName}`);
         if (!res.ok) throw new Error("문제 로드 실패");
@@ -41,7 +36,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // 로딩 완료!
         isDataLoaded = true;
         startBtn.disabled = false;
         startBtn.innerHTML = "도전하기! 🚀";
@@ -54,21 +48,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadStatus.style.color = "red";
     }
 
-    // 엔터키 리스너
     document.getElementById('answer-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') checkAnswer();
     });
 });
 
-// [NEW] 퀴즈 시작 함수 (버튼 클릭 시 실행)
 function startQuiz() {
     if (!isDataLoaded) return;
-
-    // 인트로 숨기고 퀴즈 레이어 보이기
     document.getElementById('intro-layer').style.display = 'none';
     const quizLayer = document.getElementById('quiz-layer');
-    quizLayer.style.display = 'flex'; // flex로 변경하여 레이아웃 유지
-
+    quizLayer.style.display = 'flex';
     renderQuestion();
 }
 
@@ -83,26 +72,28 @@ function renderQuestion() {
     const q = quizData[currentIndex];
     const reqCount = q.required_count ? parseInt(q.required_count) : 1;
     
-    // UI 초기화
     document.getElementById('result-overlay').style.display = 'none';
     document.getElementById('input-group').style.display = 'flex';
     document.getElementById('user-answer-display').style.display = 'none'; 
     document.getElementById('btn-next').style.display = 'none';
     
-    // 진행바 & 텍스트
     const percent = ((currentIndex) / quizData.length) * 100;
     document.getElementById('progress').style.width = `${percent}%`;
     document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
     document.getElementById('q-text').innerText = q.question || "내용 없음"; 
     
     const input = document.getElementById('answer-input');
-    if (reqCount > 1) {
-        input.placeholder = `정답 ${reqCount}개가 필요합니다 (쉼표 ','로 구분)`;
-    } else {
-        input.placeholder = "정답 입력";
+    
+    // placeholder에 '완전 일치' 여부 힌트 추가
+    let placeholderText = "정답 입력";
+    if (q.is_strict) {
+        placeholderText = "정답 입력 (★정확히 입력하세요)";
     }
+    if (reqCount > 1) {
+        placeholderText += ` / ${reqCount}개 필요 (쉼표 구분)`;
+    }
+    input.placeholder = placeholderText;
 
-    // 미디어 처리
     const mediaArea = document.getElementById('media-area');
     mediaArea.innerHTML = ''; 
 
@@ -177,6 +168,7 @@ function cleanString(str) {
     return str.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/정답[:\s]*/g, '').replace(/[:\s]/g, '').toLowerCase();
 }
 
+// [핵심 로직] 정답 체크
 function checkAnswer() {
     const input = document.getElementById('answer-input');
     if (input.disabled) return;
@@ -188,15 +180,23 @@ function checkAnswer() {
 
     const q = quizData[currentIndex];
     const requiredCount = parseInt(q.required_count) || 1;
+    const isStrict = q.is_strict; // 완전 일치 모드 여부
     
     const dbAnswers = q.answer.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
     const userInputs = userAns.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
 
     let matchCount = 0;
     const uniqueUserInputs = [...new Set(userInputs)];
+
     uniqueUserInputs.forEach(uInput => {
         const isHit = dbAnswers.some(dbAns => {
-            return dbAns === uInput || (dbAns.includes(uInput) && uInput.length >= 1);
+            if (isStrict) {
+                // [완전 일치 모드] 정확히 같아야 함 ('집행' == '집행유예' -> False)
+                return dbAns === uInput;
+            } else {
+                // [일반 모드] 포함되어 있으면 인정 ('집행' -> '집행유예' 포함 -> True)
+                return dbAns === uInput || (dbAns.includes(uInput) && uInput.length >= 1);
+            }
         });
         if (isHit) matchCount++;
     });
@@ -260,25 +260,20 @@ function goNextQuestion() {
     renderQuestion();
 }
 
-// [NEW] 최종 결과 화면 (100점 환산 & 통계)
 function showFinalResult() {
     const container = document.querySelector('.fixed-container');
-    
-    // 100점 만점 환산 (소수점 반올림)
     const finalScore = Math.round((score / quizData.length) * 100);
     
     container.innerHTML = `
         <div style="text-align:center; margin-top:50px; display:flex; flex-direction:column; justify-content:center; height:100%;">
             <h1 style="font-size:4rem; margin-bottom:10px;">🎉 퀴즈 종료!</h1>
             <p style="font-size:2rem; color:#666;">모든 문제를 풀었습니다.</p>
-            
             <div style="margin: 40px 0;">
                 <div style="font-size:8rem; font-weight:900; color:#007bff;">${finalScore}점</div>
                 <div style="font-size:2.5rem; color:#333; font-weight:bold; margin-top:20px;">
                     (정답 ${score}개 / 전체 ${quizData.length}문제)
                 </div>
             </div>
-
             <button class="btn-next" style="width:300px; margin:0 auto;" onclick="location.href='../select_page/user_main.html'">
                 목록으로 돌아가기
             </button>
