@@ -269,7 +269,7 @@ router.get('/get-quiz-settings', async (req, res) => {
         
         // quiz_bundles 테이블에서 설정값(시간, 모드 등)을 조회합니다.
         const result = await client.query(`
-            SELECT quiz_mode, use_pause, time_limit, use_time_limit
+            SELECT quiz_mode, time_limit, use_time_limit
             FROM quiz_bundles
             WHERE target_db_name = $1
         `, [dbName]);
@@ -280,7 +280,6 @@ router.get('/get-quiz-settings', async (req, res) => {
             // DB에 있는 값을 그대로 클라이언트에 보냅니다.
             res.json({
                 quiz_mode: row.quiz_mode,
-                use_pause: row.use_pause,
                 time_limit: row.time_limit,          // DB에 20이라고 있으면 20이 나갑니다.
                 use_time_limit: row.use_time_limit
             });
