@@ -25,9 +25,15 @@
         </div>
 
         <div class="form-group">
-            <label>3. 문제 입력 (형식: 문제 | 정답)</label>
-            <textarea id="content" placeholder="예시)&#13;&#10;사과는 영어로? | Apple&#13;&#10;1+1은? | 2&#13;&#10;..."></textarea>
-            <p class="tip">※ 한 줄에 한 문제씩, 파이프 기호(|)로 문제와 정답을 구분하세요.</p>
+            <label>3. 문제 입력</label>
+            
+            <div style="background: #eef; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                <span style="font-weight:bold; font-size:0.9rem;">📂 텍스트 파일로 불러오기 (자동 변환)</span>
+                <input type="file" id="text-file-input" accept=".txt" style="margin-top:5px;">
+                <p class="tip">※ 메모장(.txt) 파일을 선택하면 자동으로 아래 입력창에 '문제 | 정답' 형식으로 변환되어 입력됩니다.</p>
+            </div>
+
+            <textarea id="content" placeholder="직접 입력 시 형식: 문제 | 정답&#13;&#10;(한 줄에 한 문제씩 입력하세요)"></textarea>
         </div>
 
         <button class="save-btn" onclick="uploadQuiz()">💾 DB 생성 및 저장하기</button>
