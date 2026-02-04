@@ -34,14 +34,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (loadStatus) loadStatus.innerText = "로딩 중...";
 
     try {
-        // [핵심] 서버 연결 (파일 구조에 맞춘 경로)
+        // [핵심] 서버 연결 및 상세 에러 검출 로직
         const res = await fetch(`/api/admin_api/get-quiz-detail?dbName=${dbName}`);
         
         // 서버 에러(HTML 응답 등) 체크
         if (!res.ok) {
             const errText = await res.text();
+            let finalMsg = "서버 연결 실패";
+            
+            // JSON인지 HTML인지 확인해서 메시지 추출
+            try {
+                const jsonErr = JSON.parse(errText);
+                finalMsg = jsonErr.error || jsonErr.message || jsonErr.details || errText;
+            } catch (e) {
+                // HTML 에러인 경우 (예: Unexpected token <)
+                finalMsg = errText.substring(0, 300); 
+            }
+
+            // ★ 에러 발생 시 사용자에게 팝업으로 상세 내용 출력
+            alert(`[로딩 에러 발생]\n상태코드: ${res.status}\n내용: ${finalMsg}`);
             console.error("서버 에러 내용:", errText);
-            throw new Error("서버 연결 실패 (관리자 페이지에서 DB가 제대로 생성되었는지 확인해주세요)");
+            throw new Error(finalMsg);
         }
         
         quizData = await res.json();
@@ -68,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.error(err);
         if (loadStatus) {
-            // [Image 6] 화면처럼 에러 메시지 표시
+            // 화면에 에러 메시지 표시
             loadStatus.innerText = "로딩 실패: " + err.message;
             loadStatus.style.color = "red";
         }
