@@ -8,32 +8,40 @@
 </head>
 <body>
 
-    <div class="container">
+    <div class="fixed-container">
         <div class="top-bar">
             <div class="progress-container">
                 <div class="progress-fill" id="progress"></div>
             </div>
-            <div id="timer-box">⏳ <span id="timer-sec">15</span>초</div>
+            <div class="info-row">
+                <span id="q-num" class="q-num-text">Q. 1 / --</span>
+                <span id="timer-box">⏳ <span id="timer-sec">15</span>초</span>
+            </div>
         </div>
         
-        <div id="quiz-content-area">
-            <div class="q-number" id="q-num">Q. - / -</div>
-            
-            <div class="q-content">
-                <h2 id="q-text">문제를 불러오는 중...</h2>
-                <div id="media-area" class="media-area"></div>
+        <div class="question-section">
+            <h1 id="q-text">문제를 불러오는 중...</h1>
+        </div>
+
+        <div class="media-wrapper">
+            <div id="media-area" class="media-placeholder">
+                <span class="no-media-text">No Image</span>
             </div>
 
-            <div class="input-area">
-                <input type="text" id="answer-input" placeholder="정답을 입력하세요" autocomplete="off">
-                <button class="btn-submit" onclick="checkAnswer()">제출</button>
+            <div id="result-overlay" class="result-overlay" style="display: none;">
+                <div id="overlay-content"></div>
             </div>
         </div>
 
-        <div id="result-msg"></div>
+        <div class="bottom-control">
+            <div id="input-group" class="input-group">
+                <input type="text" id="answer-input" placeholder="정답 입력" autocomplete="off">
+                <button class="btn-submit" onclick="checkAnswer()">제출</button>
+            </div>
 
-        <div id="next-btn-area" style="display:none; margin-top:20px;">
-            <button class="btn-next" onclick="goNextQuestion()">다음 문제 ➡️</button>
+            <button id="btn-next" class="btn-next" style="display:none;" onclick="goNextQuestion()">
+                다음 문제 ➡️
+            </button>
         </div>
     </div>
 
