@@ -3,10 +3,10 @@ const { Client } = require('pg');
 const multer = require('multer');
 const router = express.Router();
 
-// 파일 업로드 설정 (메모리 저장)
+// 파일 업로드 설정
 const upload = multer({ 
     storage: multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB 제한
+    limits: { fileSize: 50 * 1024 * 1024 } 
 });
 
 const getClient = () => {
@@ -26,22 +26,21 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 2. 퀴즈 생성 (에러 처리 강화됨)
+// 2. 퀴즈 생성 (DB 충돌 방지 로직 추가)
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     try {
         const { title, dbName, creator, description, quizData, quizMode = 'input' } = req.body;
         const imageFile = req.file;
         
-        // DB 이름 유효성 재검사 (서버측)
+        // DB 이름 정제
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
-        if (!safeDbName) throw new Error("유효하지 않은 DB 이름입니다.");
+        if (!safeDbName) throw new Error("DB 이름이 비어있거나 잘못되었습니다.");
 
         await client.connect();
         await client.query('BEGIN'); // 트랜잭션 시작
 
-        // (1) 퀴즈 묶음 정보 저장 (quiz_bundles)
-        // use_pause 컬럼도 고려 (기본값 false)
+        // (1) 메인 묶음 테이블 생성 (없을 경우)
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -57,20 +56,29 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
-        // 중복 DB명 체크를 위해 INSERT 시도
+        // (2) 퀴즈 묶음 정보 등록
+        // 중복된 DB명이면 에러 발생
+        const checkExist = await client.query('SELECT 1 FROM quiz_bundles WHERE target_db_name = $1', [safeDbName]);
+        if (checkExist.rowCount > 0) {
+            throw new Error("이미 존재하는 DB 이름입니다. 다른 이름을 사용해주세요.");
+        }
+
         const insertBundleQuery = `
             INSERT INTO quiz_bundles 
-            (title, target_db_name, creator, description, image_data, image_type, quiz_mode)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            (title, target_db_name, creator, description, image_data, image_type, quiz_mode, use_pause)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, false)
         `;
         const imgBuffer = imageFile ? imageFile.buffer : null;
         const imgType = imageFile ? imageFile.mimetype : null;
         
         await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType, quizMode]);
 
-        // (2) 개별 퀴즈 테이블 생성
+        // (3) [핵심 수정] 개별 퀴즈 테이블 생성
+        // ★ 만약 이전에 만들다 만 찌꺼기 테이블이 있으면 삭제하고 다시 만듦 (에러 방지)
+        await client.query(`DROP TABLE IF EXISTS ${safeDbName}`);
+
         await client.query(`
-            CREATE TABLE IF NOT EXISTS ${safeDbName} (
+            CREATE TABLE ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
                 quiz_no int NOT NULL,
                 question text NOT NULL,
@@ -84,15 +92,16 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
-        // (3) 데이터 파싱 및 삽입
+        // (4) 데이터 파싱 및 삽입
         let quizzes = [];
         try {
             quizzes = JSON.parse(quizData);
         } catch (e) {
-            throw new Error("전송된 데이터(JSON) 형식이 잘못되었습니다.");
+            throw new Error("전송된 데이터(JSON) 형식이 깨졌습니다.");
         }
 
         for (const q of quizzes) {
+            // 새 컬럼들(explanation, required_count, is_strict) 기본값 포함해서 넣기
             await client.query(
                 `INSERT INTO ${safeDbName} (quiz_no, question, answer, explanation, required_count, is_strict) 
                  VALUES ($1, $2, $3, '', 1, true)`,
@@ -100,33 +109,26 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             );
         }
 
-        await client.query('COMMIT'); // 성공 시 반영
-        res.json({ message: "✅ 퀴즈 DB가 성공적으로 생성되었습니다!" });
+        await client.query('COMMIT'); 
+        res.json({ message: "✅ 퀴즈 등록 성공!" });
 
     } catch (error) {
-        await client.query('ROLLBACK'); // 실패 시 되돌리기
-        console.error("DB 생성 에러:", error); // 서버 로그 출력
-
-        // 클라이언트에 구체적인 에러 메시지 전달
-        if (error.code === '23505') { // Postgres Unique Violation Code
-            res.status(400).json({ error: "이미 존재하는 DB 이름입니다. 다른 이름을 써주세요." });
-        } else {
-            res.status(500).json({ error: "서버 오류: " + error.message });
-        }
+        await client.query('ROLLBACK'); 
+        console.error("DB 생성 에러:", error);
+        res.status(500).json({ error: "생성 실패: " + error.message });
     } finally {
         await client.end();
     }
 });
 
-// 3. 목록 불러오기 (★ use_pause가 true면 숨김 처리)
+// 3. 목록 불러오기
 router.get('/list-quizzes', async (req, res) => {
     const client = getClient();
     try {
         await client.connect();
 
-        // use_pause가 true인 것은 제외하고 가져오기
-        // (컬럼이 없을 수도 있으니 에러 방지를 위해 테이블 확인 후 쿼리하거나, 단순하게 처리)
-        // 여기서는 위 SQL에서 컬럼을 추가했다고 가정하고 필터링합니다.
+        // use_pause 컬럼이 없어서 에러나는 경우를 대비해 예외처리 쿼리 사용 가능하지만
+        // 위 SQL을 실행했다고 가정하고 조회
         const result = await client.query(`
             SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode
             FROM quiz_bundles 
@@ -145,7 +147,7 @@ router.get('/list-quizzes', async (req, res) => {
 
         res.json(quizzes);
     } catch (error) {
-        console.error("목록 로드 에러:", error);
+        console.error("목록 에러:", error);
         res.status(500).json({ error: error.message });
     } finally {
         await client.end();
@@ -158,22 +160,10 @@ router.get('/get-quiz-detail', async (req, res) => {
     try {
         const { dbName } = req.query;
         if(!dbName) throw new Error("DB명이 없습니다.");
-
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, ''); 
+        
         await client.connect();
         
-        // 테이블 존재 여부 확인 (안전장치)
-        const checkTable = await client.query(`
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = $1
-            );
-        `, [safeDbName]);
-
-        if (!checkTable.rows[0].exists) {
-            throw new Error("해당 퀴즈 테이블을 찾을 수 없습니다.");
-        }
-
         const query = `
             SELECT id, quiz_no, question, answer, explanation, required_count, is_strict, image_url, image_type, image_data 
             FROM ${safeDbName} 
