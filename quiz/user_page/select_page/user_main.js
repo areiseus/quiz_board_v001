@@ -56,6 +56,34 @@ async function loadQuizList() {
                     </div>
                 </div>
             `;
+
+            /// 직접 추가부분
+if (item.quiz_activate === false) {
+    // 1. 반투명 회색 처리
+    card.style.opacity = '0.5';
+    card.style.filter = 'grayscale(100%)';
+    card.style.backgroundColor = '#e0e0e0'; // 배경 회색
+
+    // 2. 클릭 방지 (pointer-events: none)
+    card.style.pointerEvents = 'none';
+    card.style.cursor = 'default';
+
+    // 3. 제목에 [준비중] 태그 추가
+    // (카드 안에 .title 클래스나 h3 등이 있다고 가정)
+    const titleEl = card.querySelector('.quiz-title') || card.querySelector('h3') || card.querySelector('div');
+    if (titleEl) {
+        titleEl.innerText = "[준비중] " + titleEl.innerText;
+        titleEl.style.color = "#555";
+    }
+
+    // 4. 혹시 모를 onclick 이벤트 제거
+    card.onclick = null;
+    const btn = card.querySelector('button');
+    if(btn) btn.disabled = true;
+}
+
+/// 직접 추가부분
+            
             container.appendChild(card);
         });
 
