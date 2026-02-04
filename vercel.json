@@ -8,8 +8,7 @@
   ],
   "rewrites": [
     {
-      "source": "/api/admin_api/:path*",
-      "destination": "/api/admin_api.js"
+      { "source": "/(.*)", "destination": "/env/quiz_server.js" }
     }
   ]
 }
