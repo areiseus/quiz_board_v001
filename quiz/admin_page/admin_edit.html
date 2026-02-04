@@ -44,8 +44,22 @@
             </div>
         </div>
     </div>
+<div class="floating-menu">
+        <button class="float-btn-cancel" onclick="cancelEdit()">❌ 취소</button>
+        <button class="float-btn-save" onclick="saveChanges()">💾 저장하기</button>
+    </div>
 
     <script src="admin_edit.js"></script>
+    
+    <script>
+        function cancelEdit() {
+            if(confirm("수정사항을 취소하고 원래대로 되돌리시겠습니까?")) {
+                // 현재 선택된 퀴즈를 다시 불러와서(Reload) 수정사항 초기화
+                // (admin_edit.js에 있는 loadQuizDetail 함수가 이미 전역변수 currentDbName을 갖고 있다고 가정)
+                // 만약 복잡하면 그냥 페이지 새로고침이 제일 확실합니다.
+                location.reload(); 
+            }
+        }
+    </script>
 </body>
 </html>
-
