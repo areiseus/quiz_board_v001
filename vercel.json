@@ -5,8 +5,13 @@
       "src": "env/quiz_server.js",
       "use": "@vercel/node"
     }
-  ],
+],
+
+{
   "rewrites": [
-    { "source": "/(.*)", "destination": "/env/quiz_server.js" }
+    {
+      "source": "/api/admin_api/:path*",
+      "destination": "/api/admin_api.js"
+    }
   ]
-}
+}  
