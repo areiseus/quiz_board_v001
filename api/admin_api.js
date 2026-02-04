@@ -253,8 +253,9 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
     } finally {
         await client.end();
     }
-}
+});
 
+module.exports = router;
 
 // 6. 퀴즈 설정값 가져오기 (이 부분이 없어서 시간이 15초로 고정됐던 것입니다)
 router.get('/get-quiz-settings', async (req, res) => {
@@ -295,4 +296,3 @@ router.get('/get-quiz-settings', async (req, res) => {
     }
 });
 
-module.exports = router;
