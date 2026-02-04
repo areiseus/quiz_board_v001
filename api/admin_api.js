@@ -22,7 +22,7 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 2. 퀴즈 생성 (is_strict 추가)
+// 2. 퀴즈 생성
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     try {
@@ -56,7 +56,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         const imgType = imageFile ? imageFile.mimetype : null;
         await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType, quizMode]);
 
-        // [중요] 개별 퀴즈 테이블 생성 (is_strict 추가됨)
+        // 개별 퀴즈 테이블 생성 (기본값 설정 포함)
         await client.query(`
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -65,7 +65,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 answer text NOT NULL,
                 explanation text,
                 required_count int DEFAULT 1,
-                is_strict boolean DEFAULT false, 
+                is_strict boolean DEFAULT true, 
                 image_data bytea,
                 image_type text,
                 image_url text
@@ -76,7 +76,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         for (const q of quizzes) {
             await client.query(
                 `INSERT INTO ${safeDbName} (quiz_no, question, answer, explanation, required_count, is_strict) 
-                 VALUES ($1, $2, $3, '', 1, false)`,
+                 VALUES ($1, $2, $3, '', 1, true)`,
                 [q.no, q.question, q.answer]
             );
         }
@@ -119,7 +119,7 @@ router.get('/list-quizzes', async (req, res) => {
     }
 });
 
-// 4. 상세 내용 가져오기 (is_strict 추가 조회)
+// 4. 상세 내용 가져오기
 router.get('/get-quiz-detail', async (req, res) => {
     const client = getClient();
     try {
@@ -151,7 +151,7 @@ router.get('/get-quiz-detail', async (req, res) => {
     }
 });
 
-// 5. 업데이트 (is_strict 저장 추가)
+// 5. 업데이트 (이미지 삭제 기능 추가됨)
 router.post('/update-quiz', upload.any(), async (req, res) => {
     const client = getClient();
     try {
@@ -164,19 +164,28 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
 
         for (const q of quizzes) {
             const newFile = req.files.find(f => f.fieldname === `file_${q.id}`);
+            const isStrict = (String(q.is_strict) === 'true');
+
+            // [NEW] 이미지 삭제 요청이 있는지 확인 ('true' 문자열로 옴)
+            const deleteImage = (String(q.delete_image) === 'true');
+
             let updateQuery = '';
             let params = [];
 
-            // boolean 변환 안전장치
-            const isStrict = (q.is_strict === true || q.is_strict === 'true');
-
-            if (newFile) {
+            if (deleteImage) {
+                // 1. 이미지 삭제 요청 시: 이미지 관련 컬럼을 모두 NULL로 초기화
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=NULL, image_data=NULL, image_type=NULL WHERE id=$6`;
+                params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.id];
+            } else if (newFile) {
+                // 2. 새 파일 업로드 시: 이미지 데이터 갱신
                 updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6, image_data=$7, image_type=$8 WHERE id=$9`;
                 params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, newFile.buffer, newFile.mimetype, q.id];
             } else {
+                // 3. 이미지 변경 없음: 텍스트 정보만 갱신 (기존 이미지 유지)
                 updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6 WHERE id=$7`;
                 params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, q.id];
             }
+            
             await client.query(updateQuery, params);
         }
 
