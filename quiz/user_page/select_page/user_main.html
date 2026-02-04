@@ -4,17 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>퀴즈 선택</title>
-    <link rel="stylesheet" href="user_style.css">
+    <link rel="stylesheet" href="../../assets/css/style.css"> 
+    <style>
+        /* 퀴즈 카드 스타일 (간단 적용) */
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .quiz-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
+        .quiz-card { 
+            background: white; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; 
+            cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .quiz-card:hover { transform: translateY(-5px); border-color: #007bff; }
+        .card-img { width: 100%; height: 150px; background: #eee; object-fit: cover; }
+        .card-body { padding: 15px; }
+        .card-title { margin: 0 0 10px; font-size: 1.2rem; font-weight: bold; }
+        .card-desc { font-size: 0.9rem; color: #666; margin-bottom: 10px; }
+        .card-meta { font-size: 0.8rem; color: #999; }
+    </style>
 </head>
 <body>
-    <header>
-        <h1>🎮 플레이할 퀴즈를 선택하세요</h1>
-        <button id="admin-btn" class="admin-btn">⚙️ 관리자</button>
-    </header>
-
     <div class="container">
-        <div id="quiz-list" class="quiz-grid">
-            <p style="text-align:center; width:100%;">퀴즈 목록을 불러오는 중...</p>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h1>🎮 퀴즈 목록</h1>
+            <button onclick="location.href='../../admin_page/admin_main.html'" style="padding:5px 10px; cursor:pointer;">⚙️ 관리자</button>
+        </div>
+
+        <div id="quiz-list-container" class="quiz-list">
+            <p>퀴즈 목록을 불러오는 중...</p>
         </div>
     </div>
 
