@@ -1,100 +1,105 @@
-const express = require('express');
-const { Client } = require('pg');
-const multer = require('multer');
-const router = express.Router();
+// ... (기존 create-quiz 코드 위쪽 생략) ...
 
-const upload = multer({ storage: multer.memoryStorage() });
+// ==========================================
+// [신규 기능] 퀴즈 수정 페이지용 API
+// ==========================================
 
-const getClient = () => {
-    return new Client({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
-    });
-};
-
-// 비밀번호 검증 API
-router.post('/verify-password', (req, res) => {
-    const { password } = req.body;
-    if (password === process.env.ADMIN_PASSWORD) {
-        res.json({ success: true });
-    } else {
-        res.status(401).json({ error: "비밀번호가 일치하지 않습니다." });
+// 1. 수정 가능한 퀴즈 목록 불러오기 (제목, DB명만 가볍게)
+router.get('/list-quizzes', async (req, res) => {
+    const client = getClient();
+    try {
+        await client.connect();
+        // quiz_bundles 테이블에서 목록 조회
+        const result = await client.query(`
+            SELECT title, target_db_name, creator, created_at 
+            FROM quiz_bundles 
+            ORDER BY created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        console.error("목록 로드 실패:", error);
+        res.status(500).json({ error: "목록을 불러오지 못했습니다." });
+    } finally {
+        await client.end();
     }
 });
 
-// 퀴즈 생성 API
-router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
+// 2. 특정 퀴즈의 상세 문제들 불러오기
+router.get('/get-quiz-detail', async (req, res) => {
     const client = getClient();
-    let isConnected = false; // [추가] 연결 상태 확인용 변수
-
     try {
-        const { title, dbName, creator, description, quizData } = req.body;
-        const imageFile = req.file;
+        const { dbName } = req.query;
+        const safeDbName = dbName.replace(/[^a-z0-9_]/g, ''); // 보안 처리
 
-        const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
-        if (safeDbName !== dbName) {
-            return res.status(400).json({ error: "DB명은 영문 소문자, 숫자, 언더바(_)만 가능합니다." });
-        }
-
-        // 1. DB 연결 시도
         await client.connect();
-        isConnected = true; // [추가] 연결 성공 표시
         
+        // 해당 테이블의 모든 문제 조회 (ID 포함)
+        const query = `SELECT id, quiz_no, question, answer, image_url, image_type FROM ${safeDbName} ORDER BY quiz_no ASC`;
+        const result = await client.query(query);
+
+        // 이미지 데이터(BLOB)가 있는지 여부만 알려줌 (데이터 자체가 크니까)
+        // 실제로는 텍스트와 URL 위주로 편집
+        res.json(result.rows);
+    } catch (error) {
+        console.error("상세 로드 실패:", error);
+        res.status(500).json({ error: "문제 내용을 불러오지 못했습니다." });
+    } finally {
+        await client.end();
+    }
+});
+
+// 3. 퀴즈 업데이트 (텍스트 수정 + 이미지 파일/URL 변경)
+router.post('/update-quiz', upload.any(), async (req, res) => {
+    const client = getClient();
+    
+    try {
+        const { dbName, quizData } = req.body;
+        const quizzes = JSON.parse(quizData); // 수정된 문제 리스트
+        
+        const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
+
+        await client.connect();
         await client.query('BEGIN');
 
-        // 2. 퀴즈 묶음 저장
-        const insertBundleQuery = `
-            INSERT INTO quiz_bundles 
-            (title, target_db_name, creator, description, image_data, image_type)
-            VALUES ($1, $2, $3, $4, $5, $6)
-        `;
-        const imgBuffer = imageFile ? imageFile.buffer : null;
-        const imgType = imageFile ? imageFile.mimetype : null;
-
-        await client.query(insertBundleQuery, [
-            title, safeDbName, creator, description, imgBuffer, imgType
-        ]);
-
-        // 3. 테이블 생성
-        const createTableQuery = `
-            CREATE TABLE IF NOT EXISTS ${safeDbName} (
-                id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-                quiz_no int NOT NULL,
-                question text NOT NULL,
-                answer text NOT NULL,
-                image_data bytea,
-                image_type text,
-                image_url text
-            )
-        `;
-        await client.query(createTableQuery);
-
-        // 4. 데이터 삽입
-        const quizzes = JSON.parse(quizData);
         for (const q of quizzes) {
-            await client.query(
-                `INSERT INTO ${safeDbName} (quiz_no, question, answer, image_data, image_type, image_url) 
-                 VALUES ($1, $2, $3, NULL, NULL, NULL)`,
-                [q.no, q.question, q.answer]
-            );
+            // 1. 파일이 새로 업로드되었는지 확인
+            // 프론트에서 file input의 name을 "file_문제ID" 형식으로 보낼 예정
+            const newFile = req.files.find(f => f.fieldname === `file_${q.id}`);
+            
+            let updateQuery = '';
+            let params = [];
+
+            if (newFile) {
+                // A. 파일이 있는 경우: 이미지 데이터까지 업데이트
+                updateQuery = `
+                    UPDATE ${safeDbName}
+                    SET question = $1, answer = $2, image_url = $3, 
+                        image_data = $4, image_type = $5
+                    WHERE id = $6
+                `;
+                params = [q.question, q.answer, q.image_url, newFile.buffer, newFile.mimetype, q.id];
+            } else {
+                // B. 파일이 없는 경우: 텍스트와 URL만 업데이트 (기존 이미지 유지)
+                updateQuery = `
+                    UPDATE ${safeDbName}
+                    SET question = $1, answer = $2, image_url = $3
+                    WHERE id = $4
+                `;
+                params = [q.question, q.answer, q.image_url, q.id];
+            }
+
+            await client.query(updateQuery, params);
         }
 
         await client.query('COMMIT');
-        res.json({ message: "퀴즈 DB 생성 완료!" });
+        res.json({ message: "✅ 수정 내용이 저장되었습니다!" });
 
     } catch (error) {
-        // [수정] 연결이 되어 있을 때만 ROLLBACK 시도
-        if (isConnected) {
-            try { await client.query('ROLLBACK'); } catch (e) { console.error("Rollback failed:", e); }
-        }
-        console.error("에러 발생:", error);
-        // 에러 내용을 화면으로 확실하게 보냄
-        res.status(500).json({ error: "DB 오류: " + error.message });
+        await client.query('ROLLBACK');
+        console.error("수정 실패:", error);
+        res.status(500).json({ error: error.message });
     } finally {
-        // [수정] 연결이 되어 있을 때만 종료
-        if (isConnected) {
-            try { await client.end(); } catch (e) {}
-        }
+        await client.end();
     }
 });
 
