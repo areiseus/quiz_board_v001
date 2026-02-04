@@ -3,34 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>퀴즈 선택</title>
-    <link rel="stylesheet" href="../../assets/css/style.css"> 
+    <title>퀴즈 풀기</title>
+    <link rel="stylesheet" href="quiz_style.css">
     <style>
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-        .quiz-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
-        .quiz-card { 
-            background: white; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; 
-            cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .quiz-card:hover { transform: translateY(-5px); border-color: #007bff; }
-        .card-body { padding: 15px; }
-        .card-title { margin: 0 0 10px; font-size: 1.2rem; font-weight: bold; }
-        .card-desc { font-size: 0.9rem; color: #666; margin-bottom: 10px; }
-        .card-meta { font-size: 0.8rem; color: #999; }
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f4f6f8; text-align: center; padding-top: 50px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        /* 진행바 */
+        .progress-bar { width: 100%; height: 10px; background: #eee; border-radius: 5px; margin-bottom: 30px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #007bff; width: 0%; transition: width 0.3s; }
+        
+        /* 문제 텍스트 */
+        .q-number { color: #007bff; font-weight: bold; margin-bottom: 15px; }
+        .q-text { font-size: 1.4rem; font-weight: bold; margin-bottom: 25px; word-break: keep-all; }
+        
+        /* 이미지 영역 */
+        .media-area img { max-width: 100%; max-height: 300px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #ddd; }
+
+        /* 입력창 및 버튼 */
+        input[type="text"] { width: 70%; padding: 12px; font-size: 1.1rem; border: 2px solid #ddd; border-radius: 8px; text-align: center; }
+        .btn-submit { padding: 12px 20px; background: #007bff; color: white; border: none; border-radius: 8px; font-size: 1.1rem; cursor: pointer; margin-left: 10px; }
+        .btn-submit:hover { background: #0056b3; }
+
+        /* 정답/오답 메시지 */
+        #result-msg { margin-top: 20px; font-weight: bold; height: 24px; }
+        .correct { color: #28a745; }
+        .wrong { color: #dc3545; }
     </style>
 </head>
 <body>
+
     <div class="container">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h1>🎮 퀴즈 목록</h1>
-            <button onclick="location.href='../../admin_page/admin_main.html'" style="padding:5px 10px; cursor:pointer;">⚙️ 관리자</button>
+        <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+        
+        <div class="q-number" id="q-num">Loading...</div>
+        <div class="q-text" id="q-text">문제를 불러오는 중입니다...</div>
+        
+        <div id="media-area" class="media-area"></div>
+
+        <div>
+            <input type="text" id="answer-input" placeholder="정답 입력" autocomplete="off">
+            <button class="btn-submit" onclick="checkAnswer()">제출</button>
         </div>
 
-        <div id="quiz-list-container" class="quiz-list">
-            <p>퀴즈 목록을 불러오는 중...</p>
-        </div>
+        <div id="result-msg"></div>
     </div>
 
-    <script src="user_main.js"></script>
+    <script src="quiz_main.js"></script>
 </body>
 </html>
