@@ -16,20 +16,25 @@
             <div id="timer-box">⏳ <span id="timer-sec">15</span>초</div>
         </div>
         
-        <div class="q-number" id="q-num">Q. - / -</div>
-        
-        <div class="q-content">
-            <h2 id="q-text">문제를 불러오는 중...</h2>
+        <div id="quiz-content-area">
+            <div class="q-number" id="q-num">Q. - / -</div>
             
-            <div id="media-area" class="media-area"></div>
-        </div>
+            <div class="q-content">
+                <h2 id="q-text">문제를 불러오는 중...</h2>
+                <div id="media-area" class="media-area"></div>
+            </div>
 
-        <div class="input-area">
-            <input type="text" id="answer-input" placeholder="정답을 입력하세요" autocomplete="off">
-            <button class="btn-submit" onclick="checkAnswer()">제출</button>
+            <div class="input-area">
+                <input type="text" id="answer-input" placeholder="정답을 입력하세요" autocomplete="off">
+                <button class="btn-submit" onclick="checkAnswer()">제출</button>
+            </div>
         </div>
 
         <div id="result-msg"></div>
+
+        <div id="next-btn-area" style="display:none; margin-top:20px;">
+            <button class="btn-next" onclick="goNextQuestion()">다음 문제 ➡️</button>
+        </div>
     </div>
 
     <script src="quiz_main.js"></script>
