@@ -3,23 +3,9 @@ const { Client } = require('pg');
 const multer = require('multer');
 const router = express.Router();
 
-// 1. 이미지를 메모리에 임시 저장하는 설정 (DB에 바로 넣기 위함)
+// 이미지를 메모리에 임시 저장 (썸네일용)
 const upload = multer({ storage: multer.memoryStorage() });
 
-// [추가] 관리자 비밀번호 검증 API
-router.post('/verify-password', (req, res) => {
-    const { password } = req.body;
-    
-    // .dbenv에 설정한 비밀번호와 비교
-    if (password === process.env.ADMIN_PASSWORD) {
-        res.json({ success: true });
-    } else {
-        res.status(401).json({ error: "비밀번호가 틀렸습니다." });
-    }
-});
-
-
-// DB 연결 함수
 const getClient = () => {
     return new Client({
         connectionString: process.env.DATABASE_URL,
@@ -27,72 +13,67 @@ const getClient = () => {
     });
 };
 
-// 2. 퀴즈 묶음 생성 및 이미지/데이터 저장 API
-// (관리자 화면에서 '저장' 누르면 여기로 옴)
+// 퀴즈 생성 및 DB 테이블 생성 API
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     
     try {
-        // 프론트에서 보낸 데이터 받기
         const { title, dbName, creator, description, quizData } = req.body;
-        const imageFile = req.file; // 업로드된 이미지 파일
+        const imageFile = req.file; // 썸네일 파일
 
-        // DB명 유효성 검사 (영어 소문자, 숫자, _ 만 허용)
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
         if (safeDbName !== dbName) {
             return res.status(400).json({ error: "DB명은 영문 소문자, 숫자, 언더바(_)만 가능합니다." });
         }
 
         await client.connect();
-        await client.query('BEGIN'); // 트랜잭션 시작
+        await client.query('BEGIN');
 
-        // A. 퀴즈 묶음 리스트(quiz_bundles)에 정보 등록 (이미지 포함)
+        // 1. 퀴즈 묶음(표지) 저장
         const insertBundleQuery = `
             INSERT INTO quiz_bundles 
             (title, target_db_name, creator, description, image_data, image_type)
             VALUES ($1, $2, $3, $4, $5, $6)
         `;
-        
-        // 이미지가 있으면 바이너리 데이터, 없으면 null
         const imgBuffer = imageFile ? imageFile.buffer : null;
         const imgType = imageFile ? imageFile.mimetype : null;
 
         await client.query(insertBundleQuery, [
-            title, 
-            safeDbName, 
-            creator, 
-            description, 
-            imgBuffer, 
-            imgType
+            title, safeDbName, creator, description, imgBuffer, imgType
         ]);
 
-        // B. 실제 퀴즈 데이터를 담을 테이블 동적 생성
+        // 2. [수정됨] 문제 테이블 생성 (이미지/URL 컬럼 추가)
+        // 나중에 이미지를 넣을 수 있게 'image_data', 'image_type', 'image_url' 컬럼을 미리 생성합니다.
         const createTableQuery = `
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
                 quiz_no int NOT NULL,
                 question text NOT NULL,
-                answer text NOT NULL
+                answer text NOT NULL,
+                image_data bytea,       -- [추가] 파일 업로드용
+                image_type text,        -- [추가] 파일 타입
+                image_url text          -- [추가] 이미지 링크용
             )
         `;
         await client.query(createTableQuery);
 
-        // C. 퀴즈 문제들 삽입
-        // quizData는 JSON 문자열로 넘어오므로 파싱 필요
+        // 3. 문제 데이터 삽입
         const quizzes = JSON.parse(quizData); 
         
         for (const q of quizzes) {
+            // 지금은 텍스트만 넣지만, 나중을 위해 이미지 컬럼 자리에는 NULL을 넣어줍니다.
             await client.query(
-                `INSERT INTO ${safeDbName} (quiz_no, question, answer) VALUES ($1, $2, $3)`,
+                `INSERT INTO ${safeDbName} (quiz_no, question, answer, image_data, image_type, image_url) 
+                 VALUES ($1, $2, $3, NULL, NULL, NULL)`,
                 [q.no, q.question, q.answer]
             );
         }
 
-        await client.query('COMMIT'); // 최종 저장
-        res.json({ message: "퀴즈 DB 생성 및 저장 완료!" });
+        await client.query('COMMIT');
+        res.json({ message: "퀴즈 DB 생성 완료! (이미지 속성 포함됨)" });
 
     } catch (error) {
-        await client.query('ROLLBACK'); // 실패 시 취소
+        await client.query('ROLLBACK');
         console.error("에러 발생:", error);
         res.status(500).json({ error: error.message });
     } finally {
