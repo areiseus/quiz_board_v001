@@ -244,7 +244,7 @@ function checkAnswer() {
     const requiredCount = parseInt(q.required_count) || 1;
     const isStrict = q.is_strict; 
     
-    const dbAnswers = q.answer.split('|').map(s => cleanString(s)).filter(s => s.length > 0);
+    const dbAnswers = q.answer.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
     const userInputs = userAns.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
 
     let matchCount = 0;
