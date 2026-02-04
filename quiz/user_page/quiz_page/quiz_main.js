@@ -39,19 +39,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 2. 설정 데이터 가져오기 (모드, 시간 등)
         try {
-            const sRes = await fetch(`/api/admin_api/get-quiz-settings?dbName=${dbName}`);
+            const sRes = await fetch(`/api/admin_api/get-quiz-quiz_bundles?dbName=${dbName}`);
             if (sRes.ok) {
-                const settings = await sRes.json();
+                const quiz_bundles = await sRes.json();
                 
                 // 시간 설정
-                if (settings.time_limit) timeLimit = parseInt(settings.time_limit);
-                if (settings.use_time_limit !== undefined) {
-                    useTimeLimit = (String(settings.use_time_limit) === 'true');
+                if (quiz_bundles.time_limit) timeLimit = parseInt(quiz_bundles.time_limit);
+                if (quiz_bundles.use_time_limit !== undefined) {
+                    useTimeLimit = (String(quiz_bundles.use_time_limit) === 'true');
                 }
 
                 // ★ [핵심] 퀴즈 모드 설정 (true: 입력형, false: 관람형)
-                if (settings.quiz_mode !== undefined) {
-                    isInputMode = (String(settings.quiz_mode) === 'true');
+                if (quiz_bundles.quiz_mode !== undefined) {
+                    isInputMode = (String(quiz_bundles.quiz_mode) === 'true');
                 }
                 
                 // ※ 관람 모드(false)라면 타이머는 무조건 켜져야 진행이 됨
