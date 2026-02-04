@@ -3,60 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>퀴즈 관리자 페이지</title>
+    <title>퀴즈 내용 수정</title>
     <link rel="stylesheet" href="admin_style.css">
+    <style>
+        /* 수정 페이지 전용 스타일 */
+        .edit-layout { display: flex; gap: 20px; margin-top: 20px; }
+        .sidebar { width: 300px; background: white; padding: 15px; border-radius: 10px; height: 80vh; overflow-y: auto; border: 1px solid #ddd; }
+        .main-editor { flex: 1; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd; min-height: 80vh; }
+        
+        .quiz-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; }
+        .quiz-item:hover { background: #f0f8ff; }
+        .quiz-item.active { background: #e7f1ff; border-left: 4px solid #007bff; font-weight: bold; }
+        
+        .q-card { background: #f9f9f9; border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+        .row-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .row-group input[type="text"] { flex: 1; }
+        
+        .img-control { background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🛠️ 퀴즈 생성 관리자</h1>
-        
-        <div class="form-group">
-            <label>1. 퀴즈 기본 정보</label>
-            <input type="text" id="title" placeholder="퀴즈 제목">
-            <input type="text" id="creator" placeholder="제작자">
-            <input type="text" id="dbName" placeholder="DB명 (영어 소문자, 숫자, _)">
-            <input type="text" id="description" placeholder="설명" style="width: 100%; margin-top: 5px;">
+    <div class="container" style="width: 1200px; max-width: 95%;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h1>✏️ 퀴즈 상세 수정</h1>
+            <button onclick="location.href='admin_main.html'" style="padding:10px; cursor:pointer;">🔙 생성 페이지로</button>
         </div>
 
-        <div class="form-group">
-            <label>2. 썸네일 이미지</label>
-            <input type="file" id="thumbnail" accept="image/*">
-        </div>
-
-        <div class="form-group">
-            <label>3. 문제 입력 (편의 기능 탑재)</label>
-            
-            <div style="background: #eef; padding: 15px; border-radius: 5px; margin-bottom: 10px;">
-                <span style="font-weight:bold; font-size:0.9rem;">📂 텍스트 파일 불러오기</span>
-                <ul style="margin: 5px 0 0 20px; font-size: 0.8rem; color: #555;">
-                    <li>형식: <b>문제 / 정답</b> (슬래시 구분)</li>
-                    <li>불러오면 자동으로 <b>파이프(|)</b>로 변환됩니다.</li>
-                </ul>
-                <input type="file" id="text-file-input" accept=".txt" style="margin-top:5px;">
+        <div class="edit-layout">
+            <div class="sidebar">
+                <h3>📂 퀴즈 목록</h3>
+                <div id="quiz-list-container">로딩 중...</div>
             </div>
 
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                <span class="tip">※ 직접 입력 시: <b>문제 | 정답</b> 형식</span>
-                <button type="button" onclick="copyPipe()" style="padding:4px 8px; cursor:pointer; background:#eee; border:1px solid #aaa; border-radius:4px; font-size:0.8rem;">
-                    ' | ' 문자 복사하기
-                </button>
+            <div class="main-editor">
+                <h2 id="current-quiz-title">퀴즈를 선택해주세요</h2>
+                <div id="editor-area" style="display:none;">
+                    <div id="questions-container"></div>
+                    <button class="save-btn" onclick="saveChanges()">💾 수정사항 저장하기</button>
+                </div>
             </div>
-
-            <textarea id="content" placeholder="예시)&#13;&#10;사과는? | Apple&#13;&#10;1+1은? | 2"></textarea>
         </div>
-
-        <button class="save-btn" onclick="uploadQuiz()">💾 DB 생성 및 저장하기</button>
-        <div id="status"></div>
     </div>
 
-    <script src="admin_main.js"></script>
-    <script>
-        // 파이프 복사 스크립트
-        function copyPipe() {
-            navigator.clipboard.writeText(" | ").then(() => {
-                alert("' | ' 문자가 복사되었습니다! (Ctrl+V로 붙여넣으세요)");
-            });
-        }
-    </script>
+    <script src="admin_edit.js"></script>
 </body>
 </html>
