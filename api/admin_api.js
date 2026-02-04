@@ -33,8 +33,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
-        // (나중을 위해 테이블 생성 코드엔 날짜 컬럼을 남겨둡니다. 
-        //  하지만 지금 있는 테이블엔 없어도 상관없게 만들었습니다.)
+        // 테이블 생성 (created_at 포함)
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -88,20 +87,42 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     }
 });
 
-// 3. 목록 불러오기 (여기를 수정했습니다!)
+// ============================================================
+// 3. 목록 불러오기 (여기가 핵심 수정됨!)
+// ============================================================
 router.get('/list-quizzes', async (req, res) => {
     const client = getClient();
     try {
         await client.connect();
         
-        // [수정 완료] created_at을 빼고, uid 기준으로 정렬합니다.
+        // 1) created_at(날짜)과 image_data(이미지)를 다 가져옵니다.
         const result = await client.query(`
-            SELECT title, target_db_name, creator 
+            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type
             FROM quiz_bundles 
-            ORDER BY uid DESC
+            ORDER BY created_at DESC
         `);
-        res.json(result.rows);
+
+        // 2) 이미지 데이터를 화면에서 쓸 수 있게 변환(Base64)해서 보냅니다.
+        const quizzes = result.rows.map(row => {
+            let thumbnail = null;
+            if (row.image_data && row.image_type) {
+                // 바이너리 데이터를 Base64 문자열로 변환
+                const base64 = Buffer.from(row.image_data).toString('base64');
+                thumbnail = `data:${row.image_type};base64,${base64}`;
+            }
+
+            return {
+                title: row.title,
+                target_db_name: row.target_db_name,
+                creator: row.creator,
+                created_at: row.created_at, // 이제 날짜가 정상적으로 나갑니다.
+                thumbnail: thumbnail        // 변환된 이미지 주소
+            };
+        });
+
+        res.json(quizzes);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: error.message });
     } finally {
         await client.end();
