@@ -24,9 +24,7 @@
         </div>
 
         <div class="media-wrapper">
-            <div id="media-area" class="media-placeholder">
-                <span class="no-media-text">No Image</span>
-            </div>
+            <div id="media-area" class="media-placeholder"></div>
 
             <div id="result-overlay" class="result-overlay" style="display: none;">
                 <div id="overlay-content"></div>
@@ -37,6 +35,11 @@
             <div id="input-group" class="input-group">
                 <input type="text" id="answer-input" placeholder="정답 입력" autocomplete="off">
                 <button class="btn-submit" onclick="checkAnswer()">제출</button>
+            </div>
+
+            <div id="user-answer-display" class="user-answer-display" style="display:none;">
+                <span class="ua-label">내가 쓴 답:</span>
+                <span id="my-answer-text" class="ua-text"></span>
             </div>
 
             <button id="btn-next" class="btn-next" style="display:none;" onclick="goNextQuestion()">
