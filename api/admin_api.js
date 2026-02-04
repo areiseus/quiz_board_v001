@@ -49,7 +49,6 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 image_data bytea,
                 image_type text,
                 quiz_mode text DEFAULT 'input',
-                use_pause boolean DEFAULT false,
                 created_at timestamptz DEFAULT now()
             )
         `);
@@ -57,23 +56,12 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         // (2) 퀴즈 묶음 정보 삽입
         const insertQuery = `
             INSERT INTO quiz_bundles 
-            (title, target_db_name, creator, description, image_data, image_type, quiz_mode, use_pause)
+            (title, target_db_name, creator, description, image_data, image_type, quiz_mode )
             VALUES ($1, $2, $3, $4, $5, $6, $7, false)
         `;
         const insertParams = [title, safeDbName, creator, description, imageFile ? imageFile.buffer : null, imageFile ? imageFile.mimetype : null, quizMode];
 
-        try {
-            await client.query(insertQuery, insertParams);
-        } catch (err) {
-            if (err.message.includes('use_pause')) {
-                await client.query('ALTER TABLE quiz_bundles ADD COLUMN IF NOT EXISTS use_pause boolean DEFAULT false');
-                await client.query(insertQuery, insertParams); 
-            } else {
-                throw err; 
-            }
-        }
-
-        // (3) 개별 퀴즈 테이블 생성
+       // (3) 개별 퀴즈 테이블 생성
         await client.query(`DROP TABLE IF EXISTS ${safeDbName}`);
         await client.query(`
             CREATE TABLE ${safeDbName} (
