@@ -22,18 +22,19 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 2. 퀴즈 생성
+// 2. 퀴즈 생성 (★여기가 문제였음 - 완벽 수정)
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     try {
         const { title, dbName, creator, description, quizData, quizMode = 'input' } = req.body;
         const imageFile = req.file;
+        // DB 이름 안전하게 변환 (특수문자 제거)
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
 
         await client.connect();
         await client.query('BEGIN');
 
-        // 퀴즈 묶음 테이블
+        // (1) 퀴즈 묶음 정보 저장
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -57,7 +58,10 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         const imgType = imageFile ? imageFile.mimetype : null;
         await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType, quizMode]);
 
-        // 개별 퀴즈 테이블
+        // (2) 개별 퀴즈 테이블 생성 (★새 컬럼들 포함!)
+        // is_strict: 기본값 true (완전일치)
+        // required_count: 기본값 1
+        // explanation: 텍스트
         await client.query(`
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -73,8 +77,10 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
+        // (3) 데이터 삽입 (텍스트 파일로 올린 데이터 넣기)
         const quizzes = JSON.parse(quizData); 
         for (const q of quizzes) {
+            // 기본값으로 INSERT (설명='', 개수=1, 완전일치=true)
             await client.query(
                 `INSERT INTO ${safeDbName} (quiz_no, question, answer, explanation, required_count, is_strict) 
                  VALUES ($1, $2, $3, '', 1, true)`,
@@ -86,7 +92,8 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         res.json({ message: "✅ 생성 완료!" });
     } catch (error) {
         await client.query('ROLLBACK');
-        res.status(500).json({ error: error.message });
+        console.error("퀴즈 생성 오류:", error); // 서버 로그에 에러 출력
+        res.status(500).json({ error: "생성 실패: " + error.message });
     } finally {
         await client.end();
     }
@@ -152,7 +159,7 @@ router.get('/get-quiz-detail', async (req, res) => {
     }
 });
 
-// 5. 업데이트 (대문 이미지 수정 기능 추가됨)
+// 5. 업데이트
 router.post('/update-quiz', upload.any(), async (req, res) => {
     const client = getClient();
     try {
@@ -163,8 +170,7 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
-        // [NEW] 1. 대문(Thumbnail) 이미지 업데이트 로직
-        // 프론트엔드에서 'thumbnail'이라는 이름으로 파일을 보냈는지 확인
+        // 1. 대문 이미지 업데이트
         const thumbnailFile = req.files.find(f => f.fieldname === 'thumbnail');
         if (thumbnailFile) {
             await client.query(`
@@ -174,7 +180,7 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
             `, [thumbnailFile.buffer, thumbnailFile.mimetype, safeDbName]);
         }
 
-        // 2. 개별 문제 업데이트 로직 (기존 동일)
+        // 2. 문제 업데이트
         for (const q of quizzes) {
             const newFile = req.files.find(f => f.fieldname === `file_${q.id}`);
             const isStrict = (String(q.is_strict) === 'true');
@@ -193,7 +199,6 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
                 updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6 WHERE id=$7`;
                 params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, q.id];
             }
-            
             await client.query(updateQuery, params);
         }
 
