@@ -46,12 +46,12 @@ function renderQuestion() {
     }
 
     const q = quizData[currentIndex];
-    // [안전장치] DB에서 문자로 올 수 있으므로 숫자로 확실히 변환
     const reqCount = q.required_count ? parseInt(q.required_count) : 1;
     
     // UI 초기화
     document.getElementById('result-overlay').style.display = 'none';
     document.getElementById('input-group').style.display = 'flex';
+    document.getElementById('user-answer-display').style.display = 'none'; // 내 답 숨김
     document.getElementById('btn-next').style.display = 'none';
     
     // 진행바 & 텍스트
@@ -60,7 +60,7 @@ function renderQuestion() {
     document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
     document.getElementById('q-text').innerText = q.question || "내용 없음"; 
     
-    // [안내 문구] 2개 이상 필요하면 쉼표 안내
+    // placeholder 설정
     const input = document.getElementById('answer-input');
     if (reqCount > 1) {
         input.placeholder = `정답 ${reqCount}개가 필요합니다 (쉼표 ','로 구분)`;
@@ -68,9 +68,9 @@ function renderQuestion() {
         input.placeholder = "정답 입력";
     }
 
-    // 미디어 영역
+    // [수정] 미디어 영역 처리: 이미지가 없으면 '완전 공백'
     const mediaArea = document.getElementById('media-area');
-    mediaArea.innerHTML = '<span class="no-media-text">No Media</span>';
+    mediaArea.innerHTML = ''; // 깨끗하게 비움
 
     if (q.image_url && q.image_url.trim() !== '') {
         mediaArea.innerHTML = `<img src="${q.image_url}" alt="문제 이미지">`;
@@ -106,28 +106,13 @@ function startTimer() {
 function handleTimeOut() {
     const input = document.getElementById('answer-input');
     input.disabled = true; 
-
-    const q = quizData[currentIndex];
-    const explanation = q.explanation || ""; // 부연설명
-    const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim();
     
-    const content = document.getElementById('overlay-content');
-    
-    // [결과 화면] 시간 초과 시에도 부연설명 출력
-    content.innerHTML = `
-        <div class="overlay-msg wro-color">⏰ 시간 초과!</div>
-        <div class="overlay-sub" style="font-size:1.8rem;">정답: ${rawCleanAnswer}</div>
-        <div style="margin-top:20px; font-size:1.4rem; color:#333; background:#fff3cd; padding:15px; border-radius:10px; width:80%; margin-left:auto; margin-right:auto;">
-            ${explanation ? "💡 " + explanation : ""}
-        </div>
-    `;
-    
-    document.getElementById('result-overlay').style.display = 'flex';
-    document.getElementById('input-group').style.display = 'none';
-    document.getElementById('btn-next').style.display = 'block';
+    // 시간 초과 시에는 "시간 초과"라고 표시하거나, 입력하다 만 값을 표시
+    const userValue = input.value.trim() || "(입력 못함)";
+    showResultOverlay(false, 0, userValue, true);
 }
 
-// 문자열 정제 (공백, 특수문자 제거)
+// 문자열 정제
 function cleanString(str) {
     if (!str) return "";
     return str
@@ -138,7 +123,7 @@ function cleanString(str) {
         .toLowerCase();
 }
 
-// [핵심 로직] 다답형 채점 및 개수 카운트
+// 정답 확인
 function checkAnswer() {
     const input = document.getElementById('answer-input');
     if (input.disabled) return;
@@ -149,57 +134,87 @@ function checkAnswer() {
     input.disabled = true; 
 
     const q = quizData[currentIndex];
-    const requiredCount = parseInt(q.required_count) || 1; // 목표 개수
+    const requiredCount = parseInt(q.required_count) || 1;
     
-    // 1. DB 정답들을 쉼표로 분리 (예: "사과, 배, 포도")
     const dbAnswers = q.answer.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
-    
-    // 2. 사용자 입력도 쉼표로 분리
     const userInputs = userAns.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
 
-    // 3. 맞춘 개수 카운트
     let matchCount = 0;
-    const uniqueUserInputs = [...new Set(userInputs)]; // 중복 입력 제거
+    const uniqueUserInputs = [...new Set(userInputs)];
 
     uniqueUserInputs.forEach(uInput => {
-        // DB 정답 중 하나라도 포함하거나 일치하면 인정
         const isHit = dbAnswers.some(dbAns => {
             return dbAns === uInput || (dbAns.includes(uInput) && uInput.length >= 1);
         });
         if (isHit) matchCount++;
     });
 
-    // 4. 성공 여부 판정 (맞춘 개수 >= 필요 개수)
     const isSuccess = matchCount >= requiredCount;
-    
+    if (isSuccess) score++;
+
+    // 결과 화면 호출 (성공여부, 맞춘개수, 유저입력값)
+    showResultOverlay(isSuccess, matchCount, userAns, false);
+}
+
+// [핵심] 결과 오버레이 및 하단 내 답 표시 통합 함수
+function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
+    const q = quizData[currentIndex];
+    const requiredCount = parseInt(q.required_count) || 1;
     const explanation = q.explanation || "";
+    // 원본 정답 (대괄호만 제거하고 보여줌)
     const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim();
 
+    const overlay = document.getElementById('result-overlay');
     const content = document.getElementById('overlay-content');
 
-    if (isSuccess) {
-        score++;
-        content.innerHTML = `
-            <div class="overlay-msg cor-color">⭕ 정답입니다!</div>
-            <div style="font-size:1.5rem; color:#555;">(맞춘 개수: ${matchCount} / 필요: ${requiredCount})</div>
-            <div style="margin-top:20px; font-size:1.4rem; color:#333; background:#d4edda; padding:15px; border-radius:10px; width:80%; margin-left:auto; margin-right:auto;">
-                ${explanation ? "💡 " + explanation : ""}
-            </div>
-        `;
+    let titleHtml = '';
+    let subHtml = '';
+    let bgClass = '';
+
+    if (isTimeout) {
+        titleHtml = `<div class="overlay-msg wro-color">⏰ 시간 초과!</div>`;
+        bgClass = '#fff3cd'; // 노란색 배경
+    } else if (isSuccess) {
+        titleHtml = `<div class="overlay-msg cor-color">⭕ 정답입니다!</div>`;
+        bgClass = '#d4edda'; // 초록색 배경
     } else {
-        content.innerHTML = `
-            <div class="overlay-msg wro-color">❌ 틀렸습니다!</div>
-            <div style="font-size:1.8rem; font-weight:bold;">정답: ${rawCleanAnswer}</div>
-            <div style="font-size:1.2rem; color:#666;">(맞춘 개수: ${matchCount} / 필요: ${requiredCount})</div>
-            <div style="margin-top:20px; font-size:1.4rem; color:#333; background:#fff3cd; padding:15px; border-radius:10px; width:80%; margin-left:auto; margin-right:auto;">
-                ${explanation ? "💡 " + explanation : ""}
-            </div>
-        `;
+        titleHtml = `<div class="overlay-msg wro-color">❌ 틀렸습니다!</div>`;
+        bgClass = '#fff3cd'; // 노란색 배경
+    }
+
+    // [수정] 정답을 아주 크게 표시 (.overlay-big-answer)
+    content.innerHTML = `
+        ${titleHtml}
+        <div class="overlay-sub">정답은?</div>
+        <div class="overlay-big-answer">${rawCleanAnswer}</div>
+        
+        <div style="font-size:1.2rem; color:#555; margin-bottom:10px;">
+            (맞춘 개수: ${matchCount} / 필요: ${requiredCount})
+        </div>
+
+        <div class="exp-box" style="background:${bgClass};">
+            ${explanation ? "💡 " + explanation : "부연 설명이 없습니다."}
+        </div>
+    `;
+
+    // 하단: 입력창 숨기고 -> [내가 쓴 답] + [다음 버튼] 보이기
+    document.getElementById('input-group').style.display = 'none';
+    
+    // 내가 쓴 답 표시
+    const myAnswerBox = document.getElementById('user-answer-display');
+    const myAnswerText = document.getElementById('my-answer-text');
+    
+    myAnswerText.innerText = userAnsText;
+    if(isSuccess) {
+        myAnswerText.style.color = '#28a745'; // 내 답이 맞았으면 초록색
+    } else {
+        myAnswerText.style.color = '#dc3545'; // 틀렸으면 빨간색
     }
     
-    document.getElementById('result-overlay').style.display = 'flex';
-    document.getElementById('input-group').style.display = 'none';
+    myAnswerBox.style.display = 'flex';
     document.getElementById('btn-next').style.display = 'block';
+
+    overlay.style.display = 'flex';
 }
 
 function goNextQuestion() {
