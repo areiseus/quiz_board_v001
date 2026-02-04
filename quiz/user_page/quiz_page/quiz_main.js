@@ -49,9 +49,9 @@ function renderQuestion() {
 
     const q = quizData[currentIndex];
     
-    // UI 초기화 (숨겼던 문제 영역 다시 보여주기)
+    // UI 초기화
     document.getElementById('quiz-content-area').style.display = 'block';
-    document.getElementById('next-btn-area').style.display = 'none'; // 다음 버튼 숨김
+    document.getElementById('next-btn-area').style.display = 'none';
     document.getElementById('result-msg').innerHTML = '';
     
     // 진행바
@@ -91,60 +91,82 @@ function startTimer() {
 
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
-            handleTimeOut(); // 시간 초과 처리
+            handleTimeOut(); 
         }
     }, 1000);
 }
 
-// [기능 2 & 3] 시간 초과 시: 문제 숨기고 '실패' 출력
+// 시간 초과 처리
 function handleTimeOut() {
     const input = document.getElementById('answer-input');
-    input.disabled = true; // 제출 불가
+    input.disabled = true; 
 
-    // 문제 영역 숨기기
     document.getElementById('quiz-content-area').style.display = 'none';
 
-    // 실패 메시지 크게 출력
+    // 정답 깨끗하게 보여주기 (불필요한 태그 제거 후 표시)
+    const cleanAnswerText = cleanString(quizData[currentIndex].answer);
+    
     const msgDiv = document.getElementById('result-msg');
-    msgDiv.innerHTML = `<div class="fail-text">실패!</div><p style="color:#666;">시간이 초과되었습니다.</p>`;
+    msgDiv.innerHTML = `<div class="fail-text">실패!</div><p style="color:#666;">정답은 <b>'${cleanAnswerText}'</b> 입니다.</p>`;
 
-    // 다음 문제 버튼 표시
     document.getElementById('next-btn-area').style.display = 'block';
 }
 
-// [기능 4] 정답 확인 (유연한 매칭)
+// ★ [핵심] 정답 문자열 청소 함수
+function cleanString(str) {
+    if (!str) return "";
+    return str
+        .replace(/\[.*?\]/g, '')   // [정답] 같은 대괄호 내용 삭제
+        .replace(/\(.*?\)/g, '')   // (정답) 같은 소괄호 내용 삭제
+        .replace(/정답[:\s]*/g, '') // '정답:' 또는 '정답 ' 삭제
+        .replace(/[:\s]/g, '')     // 콜론, 공백 삭제
+        .toLowerCase();            // 소문자로 통일
+}
+
+// 정답 확인
 function checkAnswer() {
     const input = document.getElementById('answer-input');
     const msg = document.getElementById('result-msg');
     
-    // 이미 제출했으면 중복 실행 방지
     if (input.disabled) return;
 
     const userAns = input.value.trim();
-    if (!userAns) return; // 빈칸 제출 방지
+    if (!userAns) return; 
 
     // 타이머 멈춤
     clearInterval(timerInterval);
-    input.disabled = true; // 수정 불가
+    input.disabled = true; 
 
-    const correctAns = quizData[currentIndex].answer;
+    const rawCorrectAns = quizData[currentIndex].answer; // 원본 정답 (화면 표시용)
     
-    // ★ 공백 제거 후 비교 (ex: "50 개" == "50개")
-    const cleanUser = userAns.replace(/\s+/g, '').toLowerCase();
-    const cleanCorrect = correctAns.replace(/\s+/g, '').toLowerCase();
+    // 1. 둘 다 청소합니다 (공백, [정답] 태그 등 제거)
+    const cleanUser = cleanString(userAns);
+    const cleanCorrect = cleanString(rawCorrectAns);
+
+    // 2. 비교 로직 (정확히 일치하거나, 정답이 유저 답을 포함하고 있을 때)
+    // 예: 정답이 "50개"이고 유저가 "50"을 입력 -> "50개".includes("50") === true -> 정답 인정!
+    let isCorrect = false;
 
     if (cleanUser === cleanCorrect) {
+        isCorrect = true;
+    } else if (cleanCorrect.includes(cleanUser) && cleanUser.length >= 1) {
+        // "50개" 안에 "50"이 포함되면 정답 처리
+        // (단, 너무 짧은 글자 방지를 위해 길이 체크)
+        isCorrect = true;
+    }
+
+    if (isCorrect) {
         msg.innerHTML = "<span class='correct'>⭕ 정답입니다!</span>";
         score++;
     } else {
-        msg.innerHTML = `<span class='wrong'>❌ 땡! 정답은 <b>'${correctAns}'</b> 입니다.</span>`;
+        // 틀렸을 때 보여주는 정답도 깔끔하게 ([정답] 떼고) 보여줍니다.
+        msg.innerHTML = `<span class='wrong'>❌ 땡! 정답은 <b>'${cleanString(rawCorrectAns)}'</b> 입니다.</span>`;
     }
 
-    // [기능 5 & 6] 바로 넘어가지 않고 버튼 표시
     document.getElementById('next-btn-area').style.display = 'block';
 }
 
-// [기능 6] 다음 문제로 넘어가기 (버튼 클릭 시 실행)
+// 다음 문제로 이동
 function goNextQuestion() {
     currentIndex++;
     renderQuestion();
