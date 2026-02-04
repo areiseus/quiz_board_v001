@@ -22,11 +22,10 @@ async function loadQuizList() {
             const card = document.createElement('div');
             card.className = 'quiz-card';
             
-            // 클릭 시 인트로 화면으로 정보 전달
+            // 기본 클릭 이벤트 (활성화 상태일 때만 동작하도록 나중에 덮어씌워짐)
             card.onclick = () => {
                 const title = encodeURIComponent(quiz.title);
                 const creator = encodeURIComponent(quiz.creator || '관리자');
-                // DB 이름은 링크 생성용으로만 사용하고 화면엔 안 보여줌
                 location.href = `../quiz_page/quiz_main.html?db=${quiz.target_db_name}&title=${title}&creator=${creator}`;
             };
 
@@ -43,7 +42,6 @@ async function loadQuizList() {
                 </div>`;
             }
 
-            // [수정] DB 이름 표시 부분 삭제
             card.innerHTML = `
                 <div style="height:150px; background:#f9f9f9; overflow:hidden;">
                     ${imageHtml}
@@ -57,32 +55,30 @@ async function loadQuizList() {
                 </div>
             `;
 
-            /// 직접 추가부분
-if (item.quiz_activate === false) {
-    // 1. 반투명 회색 처리
-    card.style.opacity = '0.5';
-    card.style.filter = 'grayscale(100%)';
-    card.style.backgroundColor = '#e0e0e0'; // 배경 회색
+            // ▼▼▼ [수정된 부분] 비활성화(준비중) 처리 로직 ▼▼▼
+            // (변수명을 item -> quiz 로 변경했습니다)
+            if (quiz.quiz_activate === false) {
+                // 1. 반투명 회색 처리
+                card.style.opacity = '0.6';
+                card.style.filter = 'grayscale(100%)';
+                card.style.backgroundColor = '#e0e0e0'; 
 
-    // 2. 클릭 방지 (pointer-events: none)
-    card.style.pointerEvents = 'none';
-    card.style.cursor = 'default';
+                // 2. 클릭 방지 (CSS)
+                card.style.pointerEvents = 'none';
+                card.style.cursor = 'default';
 
-    // 3. 제목에 [준비중] 태그 추가
-    // (카드 안에 .title 클래스나 h3 등이 있다고 가정)
-    const titleEl = card.querySelector('.quiz-title') || card.querySelector('h3') || card.querySelector('div');
-    if (titleEl) {
-        titleEl.innerText = "[준비중] " + titleEl.innerText;
-        titleEl.style.color = "#555";
-    }
+                // 3. 제목에 [준비중] 태그 추가
+                // (위 HTML에서 class="card-title"을 썼으므로 맞춰줍니다)
+                const titleEl = card.querySelector('.card-title'); 
+                if (titleEl) {
+                    titleEl.innerText = "[준비중] " + titleEl.innerText;
+                    titleEl.style.color = "#555";
+                }
 
-    // 4. 혹시 모를 onclick 이벤트 제거
-    card.onclick = null;
-    const btn = card.querySelector('button');
-    if(btn) btn.disabled = true;
-}
-
-/// 직접 추가부분
+                // 4. 클릭 이벤트 제거 (확실하게 null 처리)
+                card.onclick = null;
+            }
+            // ▲▲▲ [수정 끝] ▲▲▲
             
             container.appendChild(card);
         });
