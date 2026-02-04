@@ -5,3 +5,4 @@ PORT=3000
 # 형식: postgres://[유저명]:[비밀번호]@[호스트주소]:[포트]/postgres
 # DATABASE_URL="postgres://postgres.xxxx:비밀번호@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres"
 DATABASE_URL="postgresql://postgres:GmLw5xioDCX9vmCp@db.zxrqmhleptorukpltwpo.supabase.co:5432/postgres"
+ADMIN_PASSWORD=0925

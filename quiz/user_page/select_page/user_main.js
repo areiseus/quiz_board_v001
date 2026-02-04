@@ -47,3 +47,32 @@ async function loadQuizList() {
         listContainer.innerHTML = '<p>목록을 불러오는데 실패했습니다.</p>';
     }
 }
+
+// [추가] 관리자 버튼 클릭 이벤트
+document.getElementById('admin-btn').addEventListener('click', async () => {
+    const password = prompt("관리자 비밀번호를 입력하세요:");
+    
+    if (!password) return; // 취소하면 중단
+
+    try {
+        // 서버에 비밀번호 맞는지 물어보기
+        const response = await fetch('/api/admin/verify-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // 비밀번호 맞으면 관리자 페이지로 이동
+            // (경로는 현재 폴더 위치에 따라 다를 수 있으니 주의)
+            window.location.href = '../../admin_page/admin_main.html';
+        } else {
+            alert("⛔ 비밀번호가 틀렸습니다!");
+        }
+    } catch (error) {
+        console.error("인증 오류:", error);
+        alert("서버 오류가 발생했습니다.");
+    }
+});

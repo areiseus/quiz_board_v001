@@ -30,6 +30,8 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
+    // [필수 추가] Vercel이 이 앱을 실행할 수 있도록 내보내기
+    module.exports = app;
     console.log(`서버 가동: http://localhost:${PORT}`);
     // 보여주신 파일명 구조에 맞게 로그 출력
     console.log(`관리자: http://localhost:${PORT}/admin_page/admin_main.html`);

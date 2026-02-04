@@ -6,6 +6,19 @@ const router = express.Router();
 // 1. 이미지를 메모리에 임시 저장하는 설정 (DB에 바로 넣기 위함)
 const upload = multer({ storage: multer.memoryStorage() });
 
+// [추가] 관리자 비밀번호 검증 API
+router.post('/verify-password', (req, res) => {
+    const { password } = req.body;
+    
+    // .dbenv에 설정한 비밀번호와 비교
+    if (password === process.env.ADMIN_PASSWORD) {
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: "비밀번호가 틀렸습니다." });
+    }
+});
+
+
 // DB 연결 함수
 const getClient = () => {
     return new Client({
