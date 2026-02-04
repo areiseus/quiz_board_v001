@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // HTML 요소 연결
+    // [UI] 제목 및 제작자 표시
     const introTitle = document.getElementById('intro-title');
     const introCreator = document.getElementById('intro-creator');
     if (introTitle) introTitle.innerText = title;
@@ -28,19 +28,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (startBtn) startBtn.disabled = true;
 
     try {
-        // [서버 연결] 경로 확인 완료 (/api/admin_api/get-quiz-detail)
+        // [서버 통신] HTML 에러(Unexpected token <) 방지를 위한 경로 확인
         const res = await fetch(`/api/admin_api/get-quiz-detail?dbName=${dbName}`);
         
+        // 서버가 에러(500, 404 등)를 HTML로 줄 경우를 대비해 text로 먼저 확인
         if (!res.ok) {
-            // 에러 발생 시 텍스트 확인 (HTML 에러 페이지인지 JSON인지)
             const errText = await res.text();
-            throw new Error(`서버 응답 오류 (${res.status}): ${errText.substring(0, 50)}...`);
+            console.error("서버 에러 응답:", errText);
+            throw new Error("서버 연결 실패 (관리자 페이지에서 DB가 생성되었는지 확인하세요)");
         }
         
         quizData = await res.json();
         
         if (!quizData || quizData.length === 0) {
-            alert("불러올 문제가 없습니다.");
+            alert("문제가 없습니다.");
             location.href = '../select_page/user_main.html';
             return;
         }
@@ -58,12 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
         console.error(err);
         if (loadStatus) {
-            loadStatus.innerText = "로딩 실패";
+            loadStatus.innerText = "로딩 실패: " + err.message;
             loadStatus.style.color = "red";
         }
-        alert("퀴즈 로딩 중 오류가 발생했습니다: " + err.message);
     }
 
+    // 엔터키 정답 제출
     const answerInput = document.getElementById('answer-input');
     if (answerInput) {
         answerInput.addEventListener('keypress', (e) => {
@@ -74,13 +75,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function startQuiz() {
     if (!isDataLoaded) return;
-    
     const introLayer = document.getElementById('intro-layer');
     const quizLayer = document.getElementById('quiz-layer');
-    
     if (introLayer) introLayer.style.display = 'none';
     if (quizLayer) quizLayer.style.display = 'flex';
-    
     renderQuestion();
 }
 
@@ -95,12 +93,13 @@ function renderQuestion() {
     const q = quizData[currentIndex];
     const reqCount = q.required_count ? parseInt(q.required_count) : 1;
     
-    // UI 초기화
+    // 화면 초기화
     document.getElementById('result-overlay').style.display = 'none';
     document.getElementById('input-group').style.display = 'flex';
     document.getElementById('user-answer-display').style.display = 'none'; 
     document.getElementById('btn-next').style.display = 'none';
     
+    // 진행바
     const percent = ((currentIndex) / quizData.length) * 100;
     document.getElementById('progress').style.width = `${percent}%`;
     document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
@@ -108,17 +107,13 @@ function renderQuestion() {
     
     const input = document.getElementById('answer-input');
     
-    // placeholder 설정
+    // 힌트 표시
     let placeholderText = "정답 입력";
-    if (q.is_strict) {
-        placeholderText = "정답 입력 (★정확히 입력하세요)";
-    }
-    if (reqCount > 1) {
-        placeholderText += ` / ${reqCount}개 필요 (쉼표 구분)`;
-    }
+    if (q.is_strict) placeholderText += " (★정확히 입력)";
+    if (reqCount > 1) placeholderText += ` / ${reqCount}개 (쉼표 구분)`;
     input.placeholder = placeholderText;
 
-    // 미디어 처리 (유튜브/비디오/이미지)
+    // 미디어(유튜브/비디오/이미지) 처리
     const mediaArea = document.getElementById('media-area');
     mediaArea.innerHTML = ''; 
 
@@ -133,15 +128,11 @@ function renderQuestion() {
                 allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                 allowfullscreen></iframe>`;
         } else if (url.match(/\.(mp4|webm|ogg)$/i)) {
-            mediaArea.innerHTML = `
-                <video controls name="media">
-                    <source src="${url}" type="video/mp4">
-                </video>`;
+            mediaArea.innerHTML = `<video controls name="media"><source src="${url}" type="video/mp4"></video>`;
         } else {
             mediaArea.innerHTML = `<img src="${url}" alt="문제 이미지" onerror="this.style.display='none'">`;
         }
     } else if (q.image_data) {
-        // 서버에서 받아온 base64 이미지
         mediaArea.innerHTML = `<img src="${q.image_data}" alt="문제 이미지">`;
     }
 
@@ -166,7 +157,6 @@ function startTimer() {
     timerInterval = setInterval(() => {
         timeLeft--;
         if(timerElement) timerElement.innerText = timeLeft;
-
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
             handleTimeOut(); 
@@ -194,7 +184,7 @@ function cleanString(str) {
     return str.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/정답[:\s]*/g, '').replace(/[:\s]/g, '').toLowerCase();
 }
 
-// [핵심 로직] 정답 체크
+// [핵심] 정답 체크 로직 (원본 유지)
 function checkAnswer() {
     const input = document.getElementById('answer-input');
     if (input.disabled) return;
@@ -208,7 +198,6 @@ function checkAnswer() {
     const requiredCount = parseInt(q.required_count) || 1;
     const isStrict = q.is_strict; 
     
-    // 정답 비교 로직
     const dbAnswers = q.answer.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
     const userInputs = userAns.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
 
