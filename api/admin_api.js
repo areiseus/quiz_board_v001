@@ -253,6 +253,46 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
     } finally {
         await client.end();
     }
+}
+
+
+// 6. 퀴즈 설정값 가져오기 (이 부분이 없어서 시간이 15초로 고정됐던 것입니다)
+router.get('/get-quiz-settings', async (req, res) => {
+    const client = getClient();
+    const { dbName } = req.query;
+    
+    if (!dbName) return res.status(400).json({ error: "No DB Name" });
+
+    try {
+        await client.connect();
+        
+        // quiz_bundles 테이블에서 설정값(시간, 모드 등)을 조회합니다.
+        const result = await client.query(`
+            SELECT quiz_mode, use_pause, time_limit, use_time_limit
+            FROM quiz_bundles
+            WHERE target_db_name = $1
+        `, [dbName]);
+
+        if (result.rows.length > 0) {
+            const row = result.rows[0];
+            
+            // DB에 있는 값을 그대로 클라이언트에 보냅니다.
+            res.json({
+                quiz_mode: row.quiz_mode,
+                use_pause: row.use_pause,
+                time_limit: row.time_limit,          // DB에 20이라고 있으면 20이 나갑니다.
+                use_time_limit: row.use_time_limit
+            });
+        } else {
+            res.status(404).json({ error: "Settings not found" });
+        }
+    } catch (e) {
+        console.error("설정 로드 실패:", e.message);
+        // 에러 시 빈 객체 반환 (클라이언트가 기본값 쓰도록)
+        res.json({});
+    } finally {
+        await client.end();
+    }
 });
 
 module.exports = router;
