@@ -7,8 +7,6 @@
     }
   ],
   "rewrites": [
-    {
-      { "source": "/(.*)", "destination": "/env/quiz_server.js" }
-    }
+    { "source": "/(.*)", "destination": "/env/quiz_server.js" }
   ]
 }
