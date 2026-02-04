@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -13,26 +12,25 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// [경로 수정] env 폴더에서 한 단계 위(../)로 가서 quiz 폴더를 찾아 정적 파일로 연결
+// [정적 파일 연결]
 app.use(express.static(path.join(__dirname, '../quiz')));
 
-// [경로 수정] env 폴더에서 한 단계 위(../)로 가서 api 폴더 안의 파일 로드
+// [파일 로드]
 const adminApi = require('../api/admin_api');
-const userApi = require('../api/user_api');
+// const userApi = require('../api/user_api'); // 필요시 주석 해제
 
-// API 경로 연결
-app.use('/api/admin', adminApi);
-app.use('/api/user', userApi);
+// [핵심 수정] 프론트엔드가 /api/admin_api/... 로 요청하므로 여기도 이름을 맞춰줍니다.
+app.use('/api/admin_api', adminApi);
+// app.use('/api/user', userApi);
 
-// 메인 접속 시 사용자 퀴즈 선택 페이지로 리다이렉트
+// 메인 접속 시 리다이렉트
 app.get('/', (req, res) => {
     res.redirect('/user_page/select_page/user_main.html');
 });
 
 app.listen(PORT, () => {
-        console.log(`서버 가동: http://localhost:${PORT}`);
-    // 보여주신 파일명 구조에 맞게 로그 출력
-    console.log(`관리자: http://localhost:${PORT}/admin_page/admin_main.html`);
+    console.log(`서버 가동: http://localhost:${PORT}`);
 });
-// [필수 추가] Vercel이 이 앱을 실행할 수 있도록 내보내기
+
+// Vercel용 내보내기
 module.exports = app;
