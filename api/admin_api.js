@@ -3,7 +3,6 @@ const { Client } = require('pg');
 const multer = require('multer');
 const router = express.Router();
 
-// 이미지를 메모리에 임시 저장 (썸네일용)
 const upload = multer({ storage: multer.memoryStorage() });
 
 const getClient = () => {
@@ -13,12 +12,9 @@ const getClient = () => {
     });
 };
 
-// [필수 추가] 관리자 비밀번호 검증 API
-// 메인 화면에서 관리자 버튼을 누를 때 이 주소를 호출합니다.
+// 비밀번호 검증 API
 router.post('/verify-password', (req, res) => {
     const { password } = req.body;
-    
-    // Vercel 환경변수(ADMIN_PASSWORD)와 유저 입력값을 비교
     if (password === process.env.ADMIN_PASSWORD) {
         res.json({ success: true });
     } else {
@@ -26,24 +22,27 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 퀴즈 생성 및 DB 테이블 생성 API
+// 퀴즈 생성 API
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
-    
+    let isConnected = false; // [추가] 연결 상태 확인용 변수
+
     try {
         const { title, dbName, creator, description, quizData } = req.body;
-        const imageFile = req.file; // 썸네일 파일
+        const imageFile = req.file;
 
-        // DB명 유효성 검사
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
         if (safeDbName !== dbName) {
             return res.status(400).json({ error: "DB명은 영문 소문자, 숫자, 언더바(_)만 가능합니다." });
         }
 
+        // 1. DB 연결 시도
         await client.connect();
-        await client.query('BEGIN'); // 트랜잭션 시작
+        isConnected = true; // [추가] 연결 성공 표시
+        
+        await client.query('BEGIN');
 
-        // 1. 퀴즈 묶음(표지) 저장
+        // 2. 퀴즈 묶음 저장
         const insertBundleQuery = `
             INSERT INTO quiz_bundles 
             (title, target_db_name, creator, description, image_data, image_type)
@@ -56,25 +55,23 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             title, safeDbName, creator, description, imgBuffer, imgType
         ]);
 
-        // 2. 문제 테이블 생성 (나중에 이미지를 넣을 수 있게 컬럼 미리 생성)
+        // 3. 테이블 생성
         const createTableQuery = `
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
                 quiz_no int NOT NULL,
                 question text NOT NULL,
                 answer text NOT NULL,
-                image_data bytea,       -- [추가] 파일 업로드용
-                image_type text,        -- [추가] 파일 타입
-                image_url text          -- [추가] 이미지 링크용
+                image_data bytea,
+                image_type text,
+                image_url text
             )
         `;
         await client.query(createTableQuery);
 
-        // 3. 문제 데이터 삽입
-        const quizzes = JSON.parse(quizData); 
-        
+        // 4. 데이터 삽입
+        const quizzes = JSON.parse(quizData);
         for (const q of quizzes) {
-            // 지금은 텍스트만 넣지만, 이미지 컬럼 자리에는 NULL을 넣어줌
             await client.query(
                 `INSERT INTO ${safeDbName} (quiz_no, question, answer, image_data, image_type, image_url) 
                  VALUES ($1, $2, $3, NULL, NULL, NULL)`,
@@ -82,15 +79,22 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             );
         }
 
-        await client.query('COMMIT'); // 성공 시 저장
-        res.json({ message: "퀴즈 DB 생성 완료! (이미지 속성 포함됨)" });
+        await client.query('COMMIT');
+        res.json({ message: "퀴즈 DB 생성 완료!" });
 
     } catch (error) {
-        await client.query('ROLLBACK'); // 실패 시 되돌리기
+        // [수정] 연결이 되어 있을 때만 ROLLBACK 시도
+        if (isConnected) {
+            try { await client.query('ROLLBACK'); } catch (e) { console.error("Rollback failed:", e); }
+        }
         console.error("에러 발생:", error);
-        res.status(500).json({ error: error.message });
+        // 에러 내용을 화면으로 확실하게 보냄
+        res.status(500).json({ error: "DB 오류: " + error.message });
     } finally {
-        await client.end();
+        // [수정] 연결이 되어 있을 때만 종료
+        if (isConnected) {
+            try { await client.end(); } catch (e) {}
+        }
     }
 });
 
