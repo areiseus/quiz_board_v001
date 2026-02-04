@@ -68,24 +68,25 @@ function renderQuestion() {
         input.placeholder = "정답 입력";
     }
 
-    // 미디어 처리 (유튜브, 비디오, 이미지)
+    // 미디어 처리
     const mediaArea = document.getElementById('media-area');
-    mediaArea.innerHTML = ''; // 초기화 (완전 공백)
+    mediaArea.innerHTML = ''; // 초기화
 
     if (q.image_url && q.image_url.trim() !== '') {
         const url = q.image_url.trim();
         const youtubeId = getYouTubeId(url);
 
         if (youtubeId) {
-            // 유튜브
+            // [수정] 유튜브: autoplay=0 (자동재생 끔), enablejsapi=1 (제어 가능하게 설정)
             mediaArea.innerHTML = `
-                <iframe src="https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                <iframe id="yt-player" 
+                src="https://www.youtube.com/embed/${youtubeId}?autoplay=0&rel=0&enablejsapi=1" 
+                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                 allowfullscreen></iframe>`;
         } else if (url.match(/\.(mp4|webm|ogg)$/i)) {
-            // 동영상 파일
+            // [수정] 동영상: autoplay 속성 제거 (자동재생 끔)
             mediaArea.innerHTML = `
-                <video controls autoplay name="media">
+                <video controls name="media">
                     <source src="${url}" type="video/mp4">
                 </video>`;
         } else {
@@ -94,7 +95,6 @@ function renderQuestion() {
         }
 
     } else if (q.image_data) {
-        // 직접 업로드 이미지
         mediaArea.innerHTML = `<img src="${q.image_data}" alt="문제 이미지">`;
     }
 
@@ -127,6 +127,23 @@ function startTimer() {
             handleTimeOut(); 
         }
     }, 1000);
+}
+
+// [NEW] 미디어 재생 중지 함수 (결과 화면 뜰 때 호출)
+function stopMediaPlayback() {
+    const mediaArea = document.getElementById('media-area');
+    const iframe = mediaArea.querySelector('iframe');
+    const video = mediaArea.querySelector('video');
+
+    // 1. HTML5 비디오 태그 멈춤
+    if (video) {
+        video.pause();
+    }
+
+    // 2. 유튜브 Iframe 멈춤 (postMessage 사용)
+    if (iframe) {
+        iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'stopVideo' }), '*');
+    }
 }
 
 // 시간 초과 처리
@@ -181,8 +198,11 @@ function checkAnswer() {
     showResultOverlay(isSuccess, matchCount, userAns, false);
 }
 
-// [핵심 수정] 결과 오버레이 (부연설명 없으면 박스 제거)
+// 결과 오버레이 (여기서 미디어 중지도 실행)
 function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
+    // [중요] 결과창이 뜰 때 영상 멈추기
+    stopMediaPlayback();
+
     const q = quizData[currentIndex];
     const requiredCount = parseInt(q.required_count) || 1;
     const explanation = q.explanation ? q.explanation.trim() : "";
@@ -205,7 +225,6 @@ function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
         bgClass = '#fff3cd'; 
     }
 
-    // 부연설명 HTML 생성 (내용이 있을 때만 박스를 만듦)
     let explanationHtml = '';
     if (explanation) {
         explanationHtml = `
@@ -227,7 +246,6 @@ function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
         ${explanationHtml} 
     `;
 
-    // 하단 처리
     document.getElementById('input-group').style.display = 'none';
     
     const myAnswerBox = document.getElementById('user-answer-display');
