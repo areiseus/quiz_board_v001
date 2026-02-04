@@ -2,7 +2,7 @@ let currentDbName = null;
 let currentQuestions = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("🔧 수정 페이지 로드됨 (최종 완성판)");
+    console.log("🔧 수정 페이지 로드됨 (기능 추가 완료)");
     loadQuizList();
 });
 
@@ -43,6 +43,7 @@ async function loadQuizList() {
 async function loadQuizDetail(dbName, title, clickedElement) {
     currentDbName = dbName;
     
+    // 선택된 항목 표시
     document.querySelectorAll('.quiz-item').forEach(el => el.classList.remove('active'));
     clickedElement.classList.add('active');
     
@@ -65,10 +66,15 @@ async function loadQuizDetail(dbName, title, clickedElement) {
     }
 }
 
-// 3. 에디터 렌더링 (부연설명, 개수 설정 추가됨)
+// 3. 에디터 렌더링 (★여기에 기능이 추가되었습니다★)
 function renderEditor(questions) {
     const container = document.getElementById('questions-container');
     container.innerHTML = '';
+
+    if (questions.length === 0) {
+        container.innerHTML = '<p>문제가 없습니다.</p>';
+        return;
+    }
 
     questions.forEach((q, index) => {
         const div = document.createElement('div');
@@ -111,7 +117,7 @@ function renderEditor(questions) {
     });
 }
 
-// 4. 저장하기 (추가된 필드 전송)
+// 4. 저장하기 (★추가된 필드 전송 로직 포함★)
 async function saveChanges() {
     if (!currentDbName) return;
     if (!confirm("수정사항을 저장하시겠습니까?")) return;
