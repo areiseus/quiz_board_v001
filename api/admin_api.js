@@ -33,6 +33,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
+        // 퀴즈 묶음 테이블
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -56,7 +57,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         const imgType = imageFile ? imageFile.mimetype : null;
         await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType, quizMode]);
 
-        // 개별 퀴즈 테이블 생성 (기본값 설정 포함)
+        // 개별 퀴즈 테이블
         await client.query(`
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -151,7 +152,7 @@ router.get('/get-quiz-detail', async (req, res) => {
     }
 });
 
-// 5. 업데이트 (이미지 삭제 기능 추가됨)
+// 5. 업데이트 (대문 이미지 수정 기능 추가됨)
 router.post('/update-quiz', upload.any(), async (req, res) => {
     const client = getClient();
     try {
@@ -162,26 +163,33 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
+        // [NEW] 1. 대문(Thumbnail) 이미지 업데이트 로직
+        // 프론트엔드에서 'thumbnail'이라는 이름으로 파일을 보냈는지 확인
+        const thumbnailFile = req.files.find(f => f.fieldname === 'thumbnail');
+        if (thumbnailFile) {
+            await client.query(`
+                UPDATE quiz_bundles 
+                SET image_data = $1, image_type = $2 
+                WHERE target_db_name = $3
+            `, [thumbnailFile.buffer, thumbnailFile.mimetype, safeDbName]);
+        }
+
+        // 2. 개별 문제 업데이트 로직 (기존 동일)
         for (const q of quizzes) {
             const newFile = req.files.find(f => f.fieldname === `file_${q.id}`);
             const isStrict = (String(q.is_strict) === 'true');
-
-            // [NEW] 이미지 삭제 요청이 있는지 확인 ('true' 문자열로 옴)
             const deleteImage = (String(q.delete_image) === 'true');
 
             let updateQuery = '';
             let params = [];
 
             if (deleteImage) {
-                // 1. 이미지 삭제 요청 시: 이미지 관련 컬럼을 모두 NULL로 초기화
                 updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=NULL, image_data=NULL, image_type=NULL WHERE id=$6`;
                 params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.id];
             } else if (newFile) {
-                // 2. 새 파일 업로드 시: 이미지 데이터 갱신
                 updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6, image_data=$7, image_type=$8 WHERE id=$9`;
                 params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, newFile.buffer, newFile.mimetype, q.id];
             } else {
-                // 3. 이미지 변경 없음: 텍스트 정보만 갱신 (기존 이미지 유지)
                 updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6 WHERE id=$7`;
                 params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, q.id];
             }
