@@ -32,15 +32,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert("오류: " + err.message);
     }
 
-    // 엔터키 제출
     document.getElementById('answer-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') checkAnswer();
     });
 });
 
-// 문제 화면 그리기
 function renderQuestion() {
-    clearInterval(timerInterval); // 기존 타이머 정지
+    clearInterval(timerInterval);
 
     if (currentIndex >= quizData.length) {
         showFinalResult();
@@ -49,20 +47,21 @@ function renderQuestion() {
 
     const q = quizData[currentIndex];
     
-    // UI 초기화
-    document.getElementById('quiz-content-area').style.display = 'block';
-    document.getElementById('next-btn-area').style.display = 'none';
-    document.getElementById('result-msg').innerHTML = '';
+    // UI 초기화 (오버레이 숨기기, 입력창 보이기)
+    document.getElementById('result-overlay').style.display = 'none';
+    document.getElementById('input-group').style.display = 'flex';
+    document.getElementById('btn-next').style.display = 'none';
     
-    // 진행바
+    // 진행바 & 텍스트
     const percent = ((currentIndex) / quizData.length) * 100;
     document.getElementById('progress').style.width = `${percent}%`;
     document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
-    
-    // 텍스트 & 이미지
     document.getElementById('q-text').innerText = q.question || "내용 없음"; 
+    
+    // [이미지 처리] 항상 고정된 media-area 안에 넣음
     const mediaArea = document.getElementById('media-area');
-    mediaArea.innerHTML = ''; 
+    mediaArea.innerHTML = '<span class="no-media-text">No Media</span>'; // 기본값
+
     if (q.image_url && q.image_url.trim() !== '') {
         mediaArea.innerHTML = `<img src="${q.image_url}" alt="문제 이미지">`;
     } else if (q.image_data) {
@@ -75,11 +74,9 @@ function renderQuestion() {
     input.disabled = false;
     input.focus();
 
-    // 타이머 시작
     startTimer();
 }
 
-// 타이머
 function startTimer() {
     let timeLeft = TIME_LIMIT;
     const timerElement = document.getElementById('timer-sec');
@@ -96,93 +93,104 @@ function startTimer() {
     }, 1000);
 }
 
-// 시간 초과 처리
+// [시간 초과 처리] -> 오버레이 띄움
 function handleTimeOut() {
     const input = document.getElementById('answer-input');
     input.disabled = true; 
 
-    document.getElementById('quiz-content-area').style.display = 'none';
-
-    // 정답 깨끗하게 보여주기 (불필요한 태그 제거 후 표시)
+    // 정답 텍스트 정제
     const cleanAnswerText = cleanString(quizData[currentIndex].answer);
     
-    const msgDiv = document.getElementById('result-msg');
-    msgDiv.innerHTML = `<div class="fail-text">실패!</div><p style="color:#666;">정답은 <b>'${cleanAnswerText}'</b> 입니다.</p>`;
+    // 오버레이에 내용 넣고 표시
+    const overlay = document.getElementById('result-overlay');
+    const content = document.getElementById('overlay-content');
+    
+    content.innerHTML = `
+        <div class="overlay-msg wro-color">⏰ 시간 초과!</div>
+        <div class="overlay-sub">정답은 '${cleanAnswerText}' 입니다</div>
+    `;
+    overlay.style.display = 'flex';
 
-    document.getElementById('next-btn-area').style.display = 'block';
+    // 입력창 숨기고 다음 버튼 표시
+    document.getElementById('input-group').style.display = 'none';
+    document.getElementById('btn-next').style.display = 'block';
 }
 
-// ★ [핵심] 정답 문자열 청소 함수
+// 정제 함수
 function cleanString(str) {
     if (!str) return "";
     return str
-        .replace(/\[.*?\]/g, '')   // [정답] 같은 대괄호 내용 삭제
-        .replace(/\(.*?\)/g, '')   // (정답) 같은 소괄호 내용 삭제
-        .replace(/정답[:\s]*/g, '') // '정답:' 또는 '정답 ' 삭제
-        .replace(/[:\s]/g, '')     // 콜론, 공백 삭제
-        .toLowerCase();            // 소문자로 통일
+        .replace(/\[.*?\]/g, '')
+        .replace(/\(.*?\)/g, '')
+        .replace(/정답[:\s]*/g, '')
+        .replace(/[:\s]/g, '')
+        .toLowerCase();
 }
 
-// 정답 확인
+// [정답 확인] -> 오버레이 띄움
 function checkAnswer() {
     const input = document.getElementById('answer-input');
-    const msg = document.getElementById('result-msg');
     
     if (input.disabled) return;
-
     const userAns = input.value.trim();
     if (!userAns) return; 
 
-    // 타이머 멈춤
     clearInterval(timerInterval);
     input.disabled = true; 
 
-    const rawCorrectAns = quizData[currentIndex].answer; // 원본 정답 (화면 표시용)
-    
-    // 1. 둘 다 청소합니다 (공백, [정답] 태그 등 제거)
+    const rawCorrectAns = quizData[currentIndex].answer;
     const cleanUser = cleanString(userAns);
     const cleanCorrect = cleanString(rawCorrectAns);
 
-    // 2. 비교 로직 (정확히 일치하거나, 정답이 유저 답을 포함하고 있을 때)
-    // 예: 정답이 "50개"이고 유저가 "50"을 입력 -> "50개".includes("50") === true -> 정답 인정!
     let isCorrect = false;
-
     if (cleanUser === cleanCorrect) {
         isCorrect = true;
     } else if (cleanCorrect.includes(cleanUser) && cleanUser.length >= 1) {
-        // "50개" 안에 "50"이 포함되면 정답 처리
-        // (단, 너무 짧은 글자 방지를 위해 길이 체크)
         isCorrect = true;
     }
 
-    if (isCorrect) {
-        msg.innerHTML = "<span class='correct'>⭕ 정답입니다!</span>";
-        score++;
-    } else {
-        // 틀렸을 때 보여주는 정답도 깔끔하게 ([정답] 떼고) 보여줍니다.
-        msg.innerHTML = `<span class='wrong'>❌ 땡! 정답은 <b>'${cleanString(rawCorrectAns)}'</b> 입니다.</span>`;
-    }
+    // 오버레이 준비
+    const overlay = document.getElementById('result-overlay');
+    const content = document.getElementById('overlay-content');
 
-    document.getElementById('next-btn-area').style.display = 'block';
+    if (isCorrect) {
+        score++;
+        content.innerHTML = `
+            <div class="overlay-msg cor-color">⭕ 정답입니다!</div>
+        `;
+    } else {
+        content.innerHTML = `
+            <div class="overlay-msg wro-color">❌ 틀렸습니다!</div>
+            <div class="overlay-sub">정답: ${cleanString(rawCorrectAns)}</div>
+        `;
+    }
+    
+    // 오버레이 표시
+    overlay.style.display = 'flex';
+
+    // 입력창 숨기고 다음 버튼 표시
+    document.getElementById('input-group').style.display = 'none';
+    document.getElementById('btn-next').style.display = 'block';
 }
 
-// 다음 문제로 이동
 function goNextQuestion() {
     currentIndex++;
     renderQuestion();
 }
 
-// 최종 결과
 function showFinalResult() {
-    const container = document.querySelector('.container');
+    // 최종 결과도 오버레이 스타일을 활용하지 않고 컨테이너 전체를 덮어씁니다.
+    const container = document.querySelector('.fixed-container');
     container.innerHTML = `
-        <h1 style="margin-bottom:20px;">🎉 퀴즈 종료!</h1>
-        <div style="font-size:3rem; font-weight:bold; color:#007bff; margin:30px 0;">
-            ${score} / ${quizData.length}
+        <div style="text-align:center; margin-top:100px;">
+            <h1 style="font-size:4rem; margin-bottom:30px;">🎉 퀴즈 종료!</h1>
+            <div style="font-size:6rem; font-weight:bold; color:#007bff; margin:50px 0;">
+                ${score} / ${quizData.length}
+            </div>
+            <p style="font-size:2rem; color:#666;">수고하셨습니다!</p>
+            <button class="btn-next" style="margin-top:50px;" onclick="location.href='../select_page/user_main.html'">
+                목록으로 돌아가기
+            </button>
         </div>
-        <p>수고하셨습니다!</p>
-        <button class="btn-submit" style="width:100%; margin:0;" onclick="location.href='../select_page/user_main.html'">
-            목록으로 돌아가기
-        </button>
     `;
 }
