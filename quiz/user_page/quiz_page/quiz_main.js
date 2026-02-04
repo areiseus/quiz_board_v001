@@ -17,14 +17,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    document.getElementById('intro-title').innerText = title;
-    document.getElementById('intro-creator').innerText = `Created by ${creator}`;
+    // HTML 요소에 정보 넣기
+    const introTitle = document.getElementById('intro-title');
+    const introCreator = document.getElementById('intro-creator');
+    if(introTitle) introTitle.innerText = title;
+    if(introCreator) introCreator.innerText = `Created by ${creator}`;
     
     const startBtn = document.querySelector('.btn-start');
     const loadStatus = document.getElementById('loading-status');
-    startBtn.disabled = true;
+    if(startBtn) startBtn.disabled = true;
 
     try {
+        // 아까 고친 서버 API 경로와 일치함 (/api/admin_api/...)
         const res = await fetch(`/api/admin_api/get-quiz-detail?dbName=${dbName}`);
         if (!res.ok) throw new Error("문제 로드 실패");
         
@@ -37,27 +41,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         isDataLoaded = true;
-        startBtn.disabled = false;
-        startBtn.innerHTML = "도전하기! 🚀";
-        loadStatus.innerText = "로딩 완료! 준비되셨나요?";
-        loadStatus.style.color = "#28a745";
+        if(startBtn) {
+            startBtn.disabled = false;
+            startBtn.innerHTML = "도전하기! 🚀";
+        }
+        if(loadStatus) {
+            loadStatus.innerText = "로딩 완료! 준비되셨나요?";
+            loadStatus.style.color = "#28a745";
+        }
 
     } catch (err) {
         alert("오류: " + err.message);
-        loadStatus.innerText = "로딩 실패";
-        loadStatus.style.color = "red";
+        if(loadStatus) {
+            loadStatus.innerText = "로딩 실패";
+            loadStatus.style.color = "red";
+        }
     }
 
-    document.getElementById('answer-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') checkAnswer();
-    });
+    const answerInput = document.getElementById('answer-input');
+    if(answerInput) {
+        answerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkAnswer();
+        });
+    }
 });
 
 function startQuiz() {
     if (!isDataLoaded) return;
-    document.getElementById('intro-layer').style.display = 'none';
+    
+    const introLayer = document.getElementById('intro-layer');
     const quizLayer = document.getElementById('quiz-layer');
-    quizLayer.style.display = 'flex';
+    
+    if(introLayer) introLayer.style.display = 'none';
+    if(quizLayer) quizLayer.style.display = 'flex';
+    
     renderQuestion();
 }
 
@@ -72,16 +89,19 @@ function renderQuestion() {
     const q = quizData[currentIndex];
     const reqCount = q.required_count ? parseInt(q.required_count) : 1;
     
+    // UI 초기화
     document.getElementById('result-overlay').style.display = 'none';
     document.getElementById('input-group').style.display = 'flex';
     document.getElementById('user-answer-display').style.display = 'none'; 
     document.getElementById('btn-next').style.display = 'none';
     
+    // 진행바 및 텍스트
     const percent = ((currentIndex) / quizData.length) * 100;
     document.getElementById('progress').style.width = `${percent}%`;
     document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
     document.getElementById('q-text').innerText = q.question || "내용 없음"; 
     
+    // 입력창 설정
     const input = document.getElementById('answer-input');
     
     // placeholder에 '완전 일치' 여부 힌트 추가
@@ -94,6 +114,7 @@ function renderQuestion() {
     }
     input.placeholder = placeholderText;
 
+    // 미디어 처리 (유튜브, 비디오, 이미지)
     const mediaArea = document.getElementById('media-area');
     mediaArea.innerHTML = ''; 
 
@@ -126,12 +147,14 @@ function renderQuestion() {
     startTimer();
 }
 
+// 유튜브 ID 추출 유틸
 function getYouTubeId(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
 }
 
+// 타이머
 function startTimer() {
     let timeLeft = TIME_LIMIT;
     const timerElement = document.getElementById('timer-sec');
@@ -163,6 +186,7 @@ function handleTimeOut() {
     showResultOverlay(false, 0, userValue, true);
 }
 
+// 정답 정제 (특수문자 제거 등)
 function cleanString(str) {
     if (!str) return "";
     return str.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/정답[:\s]*/g, '').replace(/[:\s]/g, '').toLowerCase();
@@ -207,6 +231,7 @@ function checkAnswer() {
     showResultOverlay(isSuccess, matchCount, userAns, false);
 }
 
+// 결과 오버레이 표시
 function showResultOverlay(isSuccess, matchCount, userAnsText, isTimeout) {
     stopMediaPlayback();
     const q = quizData[currentIndex];
