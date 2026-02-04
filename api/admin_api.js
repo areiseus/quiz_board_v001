@@ -22,11 +22,10 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 2. 퀴즈 생성 (업데이트됨: 퀴즈모드, 부연설명, 카운트 추가)
+// 2. 퀴즈 생성 (is_strict 추가)
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     try {
-        // quizMode 추가됨 (기본값 input)
         const { title, dbName, creator, description, quizData, quizMode = 'input' } = req.body;
         const imageFile = req.file;
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
@@ -34,7 +33,6 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
-        // quiz_bundles 테이블 (quiz_mode 추가)
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -58,7 +56,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         const imgType = imageFile ? imageFile.mimetype : null;
         await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType, quizMode]);
 
-        // [중요] 개별 퀴즈 테이블 생성 (explanation, required_count 추가됨)
+        // [중요] 개별 퀴즈 테이블 생성 (is_strict 추가됨)
         await client.query(`
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -67,6 +65,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 answer text NOT NULL,
                 explanation text,
                 required_count int DEFAULT 1,
+                is_strict boolean DEFAULT false, 
                 image_data bytea,
                 image_type text,
                 image_url text
@@ -75,10 +74,9 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
 
         const quizzes = JSON.parse(quizData); 
         for (const q of quizzes) {
-            // 새 컬럼들도 같이 INSERT (초기엔 NULL/1)
             await client.query(
-                `INSERT INTO ${safeDbName} (quiz_no, question, answer, explanation, required_count) 
-                 VALUES ($1, $2, $3, '', 1)`,
+                `INSERT INTO ${safeDbName} (quiz_no, question, answer, explanation, required_count, is_strict) 
+                 VALUES ($1, $2, $3, '', 1, false)`,
                 [q.no, q.question, q.answer]
             );
         }
@@ -110,10 +108,7 @@ router.get('/list-quizzes', async (req, res) => {
                 const base64 = Buffer.from(row.image_data).toString('base64');
                 thumbnail = `data:${row.image_type};base64,${base64}`;
             }
-            return {
-                ...row,
-                thumbnail: thumbnail
-            };
+            return { ...row, thumbnail: thumbnail };
         });
 
         res.json(quizzes);
@@ -124,7 +119,7 @@ router.get('/list-quizzes', async (req, res) => {
     }
 });
 
-// 4. 상세 내용 가져오기 (업데이트됨)
+// 4. 상세 내용 가져오기 (is_strict 추가 조회)
 router.get('/get-quiz-detail', async (req, res) => {
     const client = getClient();
     try {
@@ -132,9 +127,8 @@ router.get('/get-quiz-detail', async (req, res) => {
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, ''); 
         await client.connect();
         
-        // explanation, required_count 추가 조회
         const query = `
-            SELECT id, quiz_no, question, answer, explanation, required_count, image_url, image_type, image_data 
+            SELECT id, quiz_no, question, answer, explanation, required_count, is_strict, image_url, image_type, image_data 
             FROM ${safeDbName} 
             ORDER BY quiz_no ASC
         `;
@@ -146,10 +140,7 @@ router.get('/get-quiz-detail', async (req, res) => {
                 const base64 = Buffer.from(row.image_data).toString('base64');
                 convertedImage = `data:${row.image_type};base64,${base64}`;
             }
-            return {
-                ...row,
-                image_data: convertedImage
-            };
+            return { ...row, image_data: convertedImage };
         });
 
         res.json(questions);
@@ -160,7 +151,7 @@ router.get('/get-quiz-detail', async (req, res) => {
     }
 });
 
-// 5. 업데이트 (업데이트됨)
+// 5. 업데이트 (is_strict 저장 추가)
 router.post('/update-quiz', upload.any(), async (req, res) => {
     const client = getClient();
     try {
@@ -176,13 +167,15 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
             let updateQuery = '';
             let params = [];
 
-            // [핵심] explanation, required_count 업데이트 추가
+            // boolean 변환 안전장치
+            const isStrict = (q.is_strict === true || q.is_strict === 'true');
+
             if (newFile) {
-                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, image_url=$5, image_data=$6, image_type=$7 WHERE id=$8`;
-                params = [q.question, q.answer, q.explanation, q.required_count, q.image_url, newFile.buffer, newFile.mimetype, q.id];
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6, image_data=$7, image_type=$8 WHERE id=$9`;
+                params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, newFile.buffer, newFile.mimetype, q.id];
             } else {
-                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, image_url=$5 WHERE id=$6`;
-                params = [q.question, q.answer, q.explanation, q.required_count, q.image_url, q.id];
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, is_strict=$5, image_url=$6 WHERE id=$7`;
+                params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.image_url, q.id];
             }
             await client.query(updateQuery, params);
         }
