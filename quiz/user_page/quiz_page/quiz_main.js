@@ -46,7 +46,8 @@ function renderQuestion() {
     }
 
     const q = quizData[currentIndex];
-    const reqCount = q.required_count || 1; // 필요 정답 수 (기본값 1)
+    // [안전장치] DB에서 문자로 올 수 있으므로 숫자로 확실히 변환
+    const reqCount = q.required_count ? parseInt(q.required_count) : 1;
     
     // UI 초기화
     document.getElementById('result-overlay').style.display = 'none';
@@ -59,7 +60,7 @@ function renderQuestion() {
     document.getElementById('q-num').innerText = `Q. ${currentIndex + 1} / ${quizData.length}`;
     document.getElementById('q-text').innerText = q.question || "내용 없음"; 
     
-    // [기능 추가] 다답형 안내 문구 표시
+    // [안내 문구] 2개 이상 필요하면 쉼표 안내
     const input = document.getElementById('answer-input');
     if (reqCount > 1) {
         input.placeholder = `정답 ${reqCount}개가 필요합니다 (쉼표 ','로 구분)`;
@@ -67,7 +68,7 @@ function renderQuestion() {
         input.placeholder = "정답 입력";
     }
 
-    // 미디어 영역 처리
+    // 미디어 영역
     const mediaArea = document.getElementById('media-area');
     mediaArea.innerHTML = '<span class="no-media-text">No Media</span>';
 
@@ -106,23 +107,22 @@ function handleTimeOut() {
     const input = document.getElementById('answer-input');
     input.disabled = true; 
 
-    // 부연설명 가져오기
-    const explanation = quizData[currentIndex].explanation || "";
-    const cleanAnswerText = cleanString(quizData[currentIndex].answer);
+    const q = quizData[currentIndex];
+    const explanation = q.explanation || ""; // 부연설명
+    const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim();
     
-    const overlay = document.getElementById('result-overlay');
     const content = document.getElementById('overlay-content');
     
-    // [수정] 결과 화면에 부연설명 추가
+    // [결과 화면] 시간 초과 시에도 부연설명 출력
     content.innerHTML = `
         <div class="overlay-msg wro-color">⏰ 시간 초과!</div>
-        <div class="overlay-sub" style="font-size:1.5rem;">정답: ${cleanAnswerText}</div>
-        <div style="margin-top:20px; font-size:1.2rem; color:#444; background:#f8f9fa; padding:10px; border-radius:10px;">
+        <div class="overlay-sub" style="font-size:1.8rem;">정답: ${rawCleanAnswer}</div>
+        <div style="margin-top:20px; font-size:1.4rem; color:#333; background:#fff3cd; padding:15px; border-radius:10px; width:80%; margin-left:auto; margin-right:auto;">
             ${explanation ? "💡 " + explanation : ""}
         </div>
     `;
-    overlay.style.display = 'flex';
-
+    
+    document.getElementById('result-overlay').style.display = 'flex';
     document.getElementById('input-group').style.display = 'none';
     document.getElementById('btn-next').style.display = 'block';
 }
@@ -138,10 +138,9 @@ function cleanString(str) {
         .toLowerCase();
 }
 
-// [핵심 기능] 정답 확인 (다중 정답 로직 적용)
+// [핵심 로직] 다답형 채점 및 개수 카운트
 function checkAnswer() {
     const input = document.getElementById('answer-input');
-    
     if (input.disabled) return;
     const userAns = input.value.trim();
     if (!userAns) return; 
@@ -150,10 +149,9 @@ function checkAnswer() {
     input.disabled = true; 
 
     const q = quizData[currentIndex];
-    const requiredCount = q.required_count || 1; // 목표 개수
+    const requiredCount = parseInt(q.required_count) || 1; // 목표 개수
     
-    // 1. DB 정답들을 쉼표로 분리해서 배열로 만듦
-    // 예: "사과, 배, 포도" -> ["사과", "배", "포도"]
+    // 1. DB 정답들을 쉼표로 분리 (예: "사과, 배, 포도")
     const dbAnswers = q.answer.split(',').map(s => cleanString(s)).filter(s => s.length > 0);
     
     // 2. 사용자 입력도 쉼표로 분리
@@ -161,48 +159,45 @@ function checkAnswer() {
 
     // 3. 맞춘 개수 카운트
     let matchCount = 0;
-    
-    // 중복 정답 방지용 (사용자가 "사과, 사과" 입력 시 1개로 처리)
-    const uniqueUserInputs = [...new Set(userInputs)];
+    const uniqueUserInputs = [...new Set(userInputs)]; // 중복 입력 제거
 
     uniqueUserInputs.forEach(uInput => {
-        // DB 정답 배열 중에 일치하는 게 있는지 확인
+        // DB 정답 중 하나라도 포함하거나 일치하면 인정
         const isHit = dbAnswers.some(dbAns => {
             return dbAns === uInput || (dbAns.includes(uInput) && uInput.length >= 1);
         });
         if (isHit) matchCount++;
     });
 
+    // 4. 성공 여부 판정 (맞춘 개수 >= 필요 개수)
     const isSuccess = matchCount >= requiredCount;
+    
     const explanation = q.explanation || "";
+    const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim();
 
-    // 결과 오버레이 표시
-    const overlay = document.getElementById('result-overlay');
     const content = document.getElementById('overlay-content');
 
     if (isSuccess) {
         score++;
         content.innerHTML = `
             <div class="overlay-msg cor-color">⭕ 정답입니다!</div>
-            <div style="font-size:1.5rem; color:#555;">(${matchCount}개 성공 / 필요 ${requiredCount}개)</div>
-            <div style="margin-top:20px; font-size:1.2rem; color:#444; background:#e3f2fd; padding:10px; border-radius:10px;">
+            <div style="font-size:1.5rem; color:#555;">(맞춘 개수: ${matchCount} / 필요: ${requiredCount})</div>
+            <div style="margin-top:20px; font-size:1.4rem; color:#333; background:#d4edda; padding:15px; border-radius:10px; width:80%; margin-left:auto; margin-right:auto;">
                 ${explanation ? "💡 " + explanation : ""}
             </div>
         `;
     } else {
-        // 보기 좋게 원본 정답 표시
-        const rawCleanAnswer = q.answer.replace(/\[.*?\]/g, '').trim(); 
         content.innerHTML = `
-            <div class="overlay-msg wro-color">❌ 아까워요!</div>
-            <div style="font-size:1.5rem; font-weight:bold;">정답: ${rawCleanAnswer}</div>
+            <div class="overlay-msg wro-color">❌ 틀렸습니다!</div>
+            <div style="font-size:1.8rem; font-weight:bold;">정답: ${rawCleanAnswer}</div>
             <div style="font-size:1.2rem; color:#666;">(맞춘 개수: ${matchCount} / 필요: ${requiredCount})</div>
-            <div style="margin-top:20px; font-size:1.2rem; color:#444; background:#fff0f3; padding:10px; border-radius:10px;">
+            <div style="margin-top:20px; font-size:1.4rem; color:#333; background:#fff3cd; padding:15px; border-radius:10px; width:80%; margin-left:auto; margin-right:auto;">
                 ${explanation ? "💡 " + explanation : ""}
             </div>
         `;
     }
     
-    overlay.style.display = 'flex';
+    document.getElementById('result-overlay').style.display = 'flex';
     document.getElementById('input-group').style.display = 'none';
     document.getElementById('btn-next').style.display = 'block';
 }
