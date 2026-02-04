@@ -2,7 +2,7 @@ let currentDbName = null;
 let currentQuestions = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("🔧 수정 페이지 로드됨 (기능 추가 완료)");
+    console.log("🔧 수정 페이지 로드됨 (완전 일치 모드 추가)");
     loadQuizList();
 });
 
@@ -43,7 +43,6 @@ async function loadQuizList() {
 async function loadQuizDetail(dbName, title, clickedElement) {
     currentDbName = dbName;
     
-    // 선택된 항목 표시
     document.querySelectorAll('.quiz-item').forEach(el => el.classList.remove('active'));
     clickedElement.classList.add('active');
     
@@ -66,15 +65,10 @@ async function loadQuizDetail(dbName, title, clickedElement) {
     }
 }
 
-// 3. 에디터 렌더링 (★여기에 기능이 추가되었습니다★)
+// 3. 에디터 렌더링 (체크박스 추가됨)
 function renderEditor(questions) {
     const container = document.getElementById('questions-container');
     container.innerHTML = '';
-
-    if (questions.length === 0) {
-        container.innerHTML = '<p>문제가 없습니다.</p>';
-        return;
-    }
 
     questions.forEach((q, index) => {
         const div = document.createElement('div');
@@ -90,10 +84,18 @@ function renderEditor(questions) {
             </div>
 
             <div style="margin-bottom:10px; padding:15px; background:#f8f9fa; border-radius:8px; border:1px solid #ddd;">
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <span style="font-size:0.9rem; font-weight:bold;">✅ 정답 인정 기준:</span>
-                    <input type="number" id="q_count_${index}" value="${q.required_count || 1}" min="1" style="width:60px; padding:5px; text-align:center; font-weight:bold;">
-                    <span style="font-size:0.8rem; color:#d63384;">개 이상 맞춰야 성공 (답이 여러 개일 때 설정)</span>
+                <div style="display:flex; align-items:center; gap:15px; margin-bottom:10px;">
+                    
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span style="font-size:0.9rem; font-weight:bold;">✅ 필요 정답 수:</span>
+                        <input type="number" id="q_count_${index}" value="${q.required_count || 1}" min="1" style="width:50px; padding:5px; text-align:center; font-weight:bold;">
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:5px; background:#fff; padding:3px 8px; border-radius:4px; border:1px solid #ccc;">
+                        <input type="checkbox" id="q_strict_${index}" ${q.is_strict ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
+                        <label for="q_strict_${index}" style="font-size:0.85rem; cursor:pointer; font-weight:bold; color:#d63384;">🔒 완전 일치 필요</label>
+                    </div>
+
                 </div>
                 
                 <textarea id="q_exp_${index}" placeholder="📖 부연설명 (정답/오답 결과 화면에 표시됩니다)" 
@@ -117,7 +119,7 @@ function renderEditor(questions) {
     });
 }
 
-// 4. 저장하기 (★추가된 필드 전송 로직 포함★)
+// 4. 저장하기
 async function saveChanges() {
     if (!currentDbName) return;
     if (!confirm("수정사항을 저장하시겠습니까?")) return;
@@ -136,9 +138,11 @@ async function saveChanges() {
             question: document.getElementById(`q_text_${index}`).value,
             answer: document.getElementById(`a_text_${index}`).value,
             image_url: document.getElementById(`q_url_${index}`).value,
-            // [NEW] 설명과 개수 데이터 수집
             explanation: document.getElementById(`q_exp_${index}`).value,
-            required_count: document.getElementById(`q_count_${index}`).value
+            required_count: document.getElementById(`q_count_${index}`).value,
+            
+            // [NEW] 체크박스 값 수집
+            is_strict: document.getElementById(`q_strict_${index}`).checked
         };
     });
 
@@ -153,7 +157,6 @@ async function saveChanges() {
         if (!res.ok) throw new Error((await res.json()).error);
 
         alert("✅ 수정 완료!");
-        // 화면 갱신
         const activeItem = document.querySelector('.quiz-item.active');
         const title = document.getElementById('current-quiz-title').innerText.replace('수정 중: ', '');
         loadQuizDetail(currentDbName, title, activeItem);
