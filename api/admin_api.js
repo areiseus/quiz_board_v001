@@ -1,7 +1,6 @@
 const express = require('express');
 const { Client } = require('pg');
 const multer = require('multer');
-// [중요] quiz_server.js에 연결되려면 Router여야 합니다.
 const router = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -34,7 +33,8 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
-        // quiz_bundles 테이블 생성
+        // (나중을 위해 테이블 생성 코드엔 날짜 컬럼을 남겨둡니다. 
+        //  하지만 지금 있는 테이블엔 없어도 상관없게 만들었습니다.)
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -48,7 +48,6 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
-        // 퀴즈 정보 등록
         const insertBundleQuery = `
             INSERT INTO quiz_bundles 
             (title, target_db_name, creator, description, image_data, image_type)
@@ -58,7 +57,6 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         const imgType = imageFile ? imageFile.mimetype : null;
         await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType]);
 
-        // 문제 테이블 생성
         await client.query(`
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -71,7 +69,6 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
-        // 문제 데이터 삽입
         const quizzes = JSON.parse(quizData); 
         for (const q of quizzes) {
             await client.query(
@@ -91,15 +88,17 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     }
 });
 
-// 3. 목록 불러오기 (여기가 문제의 404 구간이었음 -> 해결됨)
+// 3. 목록 불러오기 (여기를 수정했습니다!)
 router.get('/list-quizzes', async (req, res) => {
     const client = getClient();
     try {
         await client.connect();
+        
+        // [수정 완료] created_at을 빼고, uid 기준으로 정렬합니다.
         const result = await client.query(`
-            SELECT title, target_db_name, creator, created_at 
+            SELECT title, target_db_name, creator 
             FROM quiz_bundles 
-            ORDER BY created_at DESC
+            ORDER BY uid DESC
         `);
         res.json(result.rows);
     } catch (error) {
@@ -161,5 +160,4 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
     }
 });
 
-// [중요] router를 내보내야 quiz_server.js가 받습니다.
 module.exports = router;
