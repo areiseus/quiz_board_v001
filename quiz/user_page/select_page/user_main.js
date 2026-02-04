@@ -6,12 +6,13 @@ async function loadQuizList() {
     const container = document.getElementById('quiz-list-container');
     
     try {
+        // API 요청 (admin_api.js 파일로 요청)
         const response = await fetch('/api/admin_api/list-quizzes');
         
         if (!response.ok) throw new Error("서버 연결 실패");
 
         const quizzes = await response.json();
-        container.innerHTML = ''; 
+        container.innerHTML = ''; // 로딩 문구 삭제
 
         if (!quizzes || quizzes.length === 0) {
             container.innerHTML = '<p>등록된 퀴즈가 없습니다.</p>';
@@ -22,20 +23,20 @@ async function loadQuizList() {
             const card = document.createElement('div');
             card.className = 'quiz-card';
             
+            // [수정완료] 사용자님이 만드신 'quiz_page' 폴더로 이동하게 변경
             card.onclick = () => {
-                location.href = `../solve_page/solve_main.html?db=${quiz.target_db_name}`;
+                location.href = `../quiz_page/quiz_main.html?db=${quiz.target_db_name}`;
             };
 
-            // [날짜 처리] DB에 날짜가 있으면 변환, 없으면 현재 날짜 표시
+            // 날짜 처리 (없으면 현재 시간)
             const dateObj = quiz.created_at ? new Date(quiz.created_at) : new Date();
             const dateStr = dateObj.toLocaleDateString();
 
-            // [이미지 처리] 썸네일이 있으면 <img> 태그, 없으면 글자 아이콘
+            // 이미지 처리
             let imageHtml = '';
             if (quiz.thumbnail) {
                 imageHtml = `<img src="${quiz.thumbnail}" style="width:100%; height:100%; object-fit:cover;" alt="표지">`;
             } else {
-                // 이미지가 없을 때 보여줄 기본 화면
                 imageHtml = `<div style="display:flex; align-items:center; justify-content:center; height:100%; background:#eee; color:#aaa; font-size:2rem; font-weight:bold;">
                     ${quiz.title.substring(0, 1)}
                 </div>`;
