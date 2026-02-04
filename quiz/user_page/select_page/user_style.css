@@ -74,3 +74,21 @@ header {
     border-top: 1px solid #444;
     padding-top: 10px;
 }
+
+/* [추가] 관리자 버튼 스타일 */
+.admin-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: transparent;
+    border: 1px solid #555;
+    color: #888;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+.admin-btn:hover {
+    background-color: #444;
+    color: white;
+}
