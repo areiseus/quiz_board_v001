@@ -12,7 +12,7 @@ const getClient = () => {
     });
 };
 
-// 1. 비밀번호 검증
+// 1. 관리자 비밀번호 검증
 router.post('/verify-password', (req, res) => {
     const { password } = req.body;
     if (password === process.env.ADMIN_PASSWORD) {
@@ -22,18 +22,19 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 2. 퀴즈 생성
+// 2. 퀴즈 생성 (업데이트됨: 퀴즈모드, 부연설명, 카운트 추가)
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     try {
-        const { title, dbName, creator, description, quizData } = req.body;
+        // quizMode 추가됨 (기본값 input)
+        const { title, dbName, creator, description, quizData, quizMode = 'input' } = req.body;
         const imageFile = req.file;
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
 
         await client.connect();
         await client.query('BEGIN');
 
-        // 테이블 생성 (created_at 포함)
+        // quiz_bundles 테이블 (quiz_mode 추가)
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -43,25 +44,29 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 description text,
                 image_data bytea,
                 image_type text,
+                quiz_mode text DEFAULT 'input',
                 created_at timestamptz DEFAULT now()
             )
         `);
 
         const insertBundleQuery = `
             INSERT INTO quiz_bundles 
-            (title, target_db_name, creator, description, image_data, image_type)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            (title, target_db_name, creator, description, image_data, image_type, quiz_mode)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
         `;
         const imgBuffer = imageFile ? imageFile.buffer : null;
         const imgType = imageFile ? imageFile.mimetype : null;
-        await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType]);
+        await client.query(insertBundleQuery, [title, safeDbName, creator, description, imgBuffer, imgType, quizMode]);
 
+        // [중요] 개별 퀴즈 테이블 생성 (explanation, required_count 추가됨)
         await client.query(`
             CREATE TABLE IF NOT EXISTS ${safeDbName} (
                 id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
                 quiz_no int NOT NULL,
                 question text NOT NULL,
                 answer text NOT NULL,
+                explanation text,
+                required_count int DEFAULT 1,
                 image_data bytea,
                 image_type text,
                 image_url text
@@ -70,9 +75,10 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
 
         const quizzes = JSON.parse(quizData); 
         for (const q of quizzes) {
+            // 새 컬럼들도 같이 INSERT (초기엔 NULL/1)
             await client.query(
-                `INSERT INTO ${safeDbName} (quiz_no, question, answer, image_data, image_type, image_url) 
-                 VALUES ($1, $2, $3, NULL, NULL, NULL)`,
+                `INSERT INTO ${safeDbName} (quiz_no, question, answer, explanation, required_count) 
+                 VALUES ($1, $2, $3, '', 1)`,
                 [q.no, q.question, q.answer]
             );
         }
@@ -87,58 +93,66 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     }
 });
 
-// ============================================================
-// 3. 목록 불러오기 (여기가 핵심 수정됨!)
-// ============================================================
+// 3. 목록 불러오기
 router.get('/list-quizzes', async (req, res) => {
     const client = getClient();
     try {
         await client.connect();
-        
-        // 1) created_at(날짜)과 image_data(이미지)를 다 가져옵니다.
         const result = await client.query(`
-            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type
+            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode
             FROM quiz_bundles 
             ORDER BY created_at DESC
         `);
 
-        // 2) 이미지 데이터를 화면에서 쓸 수 있게 변환(Base64)해서 보냅니다.
         const quizzes = result.rows.map(row => {
             let thumbnail = null;
             if (row.image_data && row.image_type) {
-                // 바이너리 데이터를 Base64 문자열로 변환
                 const base64 = Buffer.from(row.image_data).toString('base64');
                 thumbnail = `data:${row.image_type};base64,${base64}`;
             }
-
             return {
-                title: row.title,
-                target_db_name: row.target_db_name,
-                creator: row.creator,
-                created_at: row.created_at, // 이제 날짜가 정상적으로 나갑니다.
-                thumbnail: thumbnail        // 변환된 이미지 주소
+                ...row,
+                thumbnail: thumbnail
             };
         });
 
         res.json(quizzes);
     } catch (error) {
-        console.error(error);
         res.status(500).json({ error: error.message });
     } finally {
         await client.end();
     }
 });
 
-// 4. 상세 내용 가져오기
+// 4. 상세 내용 가져오기 (업데이트됨)
 router.get('/get-quiz-detail', async (req, res) => {
     const client = getClient();
     try {
         const { dbName } = req.query;
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, ''); 
         await client.connect();
-        const query = `SELECT id, quiz_no, question, answer, image_url, image_type FROM ${safeDbName} ORDER BY quiz_no ASC`;
+        
+        // explanation, required_count 추가 조회
+        const query = `
+            SELECT id, quiz_no, question, answer, explanation, required_count, image_url, image_type, image_data 
+            FROM ${safeDbName} 
+            ORDER BY quiz_no ASC
+        `;
         const result = await client.query(query);
-        res.json(result.rows);
+
+        const questions = result.rows.map(row => {
+            let convertedImage = null;
+            if (row.image_data && row.image_type) {
+                const base64 = Buffer.from(row.image_data).toString('base64');
+                convertedImage = `data:${row.image_type};base64,${base64}`;
+            }
+            return {
+                ...row,
+                image_data: convertedImage
+            };
+        });
+
+        res.json(questions);
     } catch (error) {
         res.status(500).json({ error: error.message });
     } finally {
@@ -146,7 +160,7 @@ router.get('/get-quiz-detail', async (req, res) => {
     }
 });
 
-// 5. 업데이트
+// 5. 업데이트 (업데이트됨)
 router.post('/update-quiz', upload.any(), async (req, res) => {
     const client = getClient();
     try {
@@ -159,14 +173,16 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
 
         for (const q of quizzes) {
             const newFile = req.files.find(f => f.fieldname === `file_${q.id}`);
-            let updateQuery = '', params = [];
+            let updateQuery = '';
+            let params = [];
 
+            // [핵심] explanation, required_count 업데이트 추가
             if (newFile) {
-                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, image_url=$3, image_data=$4, image_type=$5 WHERE id=$6`;
-                params = [q.question, q.answer, q.image_url, newFile.buffer, newFile.mimetype, q.id];
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, image_url=$5, image_data=$6, image_type=$7 WHERE id=$8`;
+                params = [q.question, q.answer, q.explanation, q.required_count, q.image_url, newFile.buffer, newFile.mimetype, q.id];
             } else {
-                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, image_url=$3 WHERE id=$4`;
-                params = [q.question, q.answer, q.image_url, q.id];
+                updateQuery = `UPDATE ${safeDbName} SET question=$1, answer=$2, explanation=$3, required_count=$4, image_url=$5 WHERE id=$6`;
+                params = [q.question, q.answer, q.explanation, q.required_count, q.image_url, q.id];
             }
             await client.query(updateQuery, params);
         }
