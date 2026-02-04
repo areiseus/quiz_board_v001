@@ -9,43 +9,57 @@
 <body>
 
     <div class="fixed-container">
-        <div class="top-bar">
-            <div class="progress-container">
-                <div class="progress-fill" id="progress"></div>
-            </div>
-            <div class="info-row">
-                <span id="q-num" class="q-num-text">Q. 1 / --</span>
-                <span id="timer-box">⏳ <span id="timer-sec">15</span>초</span>
-            </div>
-        </div>
         
-        <div class="question-section">
-            <h1 id="q-text">문제를 불러오는 중...</h1>
-        </div>
-
-        <div class="media-wrapper">
-            <div id="media-area" class="media-placeholder"></div>
-
-            <div id="result-overlay" class="result-overlay" style="display: none;">
-                <div id="overlay-content"></div>
+        <div id="intro-layer" class="intro-layer">
+            <div class="intro-content">
+                <h1 id="intro-title" class="intro-title">퀴즈 제목 로딩 중...</h1>
+                <p id="intro-creator" class="intro-creator">제작자: ...</p>
+                <div class="intro-deco">🏁</div>
+                <button class="btn-start" onclick="startQuiz()">도전하기!</button>
+                <p class="loading-status" id="loading-status">문제 로딩 중...</p>
             </div>
         </div>
 
-        <div class="bottom-control">
-            <div id="input-group" class="input-group">
-                <input type="text" id="answer-input" placeholder="정답 입력" autocomplete="off">
-                <button class="btn-submit" onclick="checkAnswer()">제출</button>
+        <div id="quiz-layer" style="display:none; height:100%; flex-direction:column; justify-content:space-between;">
+            
+            <div class="top-bar">
+                <div class="progress-container">
+                    <div class="progress-fill" id="progress"></div>
+                </div>
+                <div class="info-row">
+                    <span id="q-num" class="q-num-text">Q. 1 / --</span>
+                    <span id="timer-box">⏳ <span id="timer-sec">15</span>초</span>
+                </div>
+            </div>
+            
+            <div class="question-section">
+                <h1 id="q-text">문제를 불러오는 중...</h1>
             </div>
 
-            <div id="user-answer-display" class="user-answer-display" style="display:none;">
-                <span class="ua-label">내가 쓴 답:</span>
-                <span id="my-answer-text" class="ua-text"></span>
+            <div class="media-wrapper">
+                <div id="media-area" class="media-placeholder"></div>
+                <div id="result-overlay" class="result-overlay" style="display: none;">
+                    <div id="overlay-content"></div>
+                </div>
             </div>
 
-            <button id="btn-next" class="btn-next" style="display:none;" onclick="goNextQuestion()">
-                다음 문제 ➡️
-            </button>
+            <div class="bottom-control">
+                <div id="input-group" class="input-group">
+                    <input type="text" id="answer-input" placeholder="정답 입력" autocomplete="off">
+                    <button class="btn-submit" onclick="checkAnswer()">제출</button>
+                </div>
+                
+                <div id="user-answer-display" class="user-answer-display" style="display:none;">
+                    <span class="ua-label">내가 쓴 답:</span>
+                    <span id="my-answer-text" class="ua-text"></span>
+                </div>
+
+                <button id="btn-next" class="btn-next" style="display:none;" onclick="goNextQuestion()">
+                    다음 문제 ➡️
+                </button>
+            </div>
         </div>
+
     </div>
 
     <script src="quiz_main.js"></script>
