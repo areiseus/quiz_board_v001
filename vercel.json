@@ -5,8 +5,8 @@
       "src": "env/quiz_server.js",
       "use": "@vercel/node"
     }
-],
-
+  ]
+},
 {
   "rewrites": [
     {
