@@ -19,6 +19,14 @@ async function loadQuizList() {
         }
 
         quizzes.forEach(quiz => {
+        // view_act가 false면 아예 화면에 그리지 않고 스킵합니다.
+        if (quiz.view_act === false) {
+            return; 
+        }
+
+
+            
+            
             const card = document.createElement('div');
             card.className = 'quiz-card';
             
