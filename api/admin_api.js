@@ -63,7 +63,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 quiz_mode boolean DEFAULT true,
                 time_limit int DEFAULT 20,
                 use_time_limit boolean DEFAULT true,
-                quiz_activate boolean DEFAULT false,
+                quiz_activate boolean DEFAULT true,
                 created_at timestamptz DEFAULT now()
             )
         `);
@@ -73,7 +73,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         const insertQuery = `
             INSERT INTO quiz_bundles 
             (title, target_db_name, creator, description, image_data, image_type, quiz_mode, time_limit, use_time_limit, quiz_activate)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
         `;
         
         // [수정 포인트 4] 파라미터($1 ~ $9) 순서대로 맵핑
