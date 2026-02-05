@@ -25,35 +25,6 @@ router.post('/verify-password', (req, res) => {
     }
 });
 
-// 2. 퀴즈 생성 (원본 유지)
-router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
-    const client = getClient();
-    try {
-        const { title, dbName, creator, description, quizData, quizMode } = req.body;
-        const imageFile = req.file;
-        const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
-
-        if (!safeDbName) throw new Error("DB 이름이 잘못되었습니다.");
-
-        await client.connect();
-        await client.query('BEGIN');
-
-        // (1) 메인 테이블 생성
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS quiz_bundles (
-                uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-                title text NOT NULL,
-                target_db_name text NOT NULL UNIQUE, 
-                creator text,
-                description text,
-                image_data bytea,
-                image_type text,
-                quiz_mode boolean DEFAULT true,
-                created_at timestamptz DEFAULT now()
-            )
-        `);
-
-
 // 2. 퀴즈 생성 (시간 설정 저장 기능 추가됨 ✨)
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
