@@ -64,6 +64,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 time_limit int DEFAULT 20,
                 use_time_limit boolean DEFAULT true,
                 quiz_activate boolean DEFAULT true,
+                view_act boolean DEFAULT true,
                 created_at timestamptz DEFAULT now()
             )
         `);
@@ -72,7 +73,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         // [수정 포인트 3] time_limit, use_time_limit, quiz_activate 컬럼 추가!
         const insertQuery = `
             INSERT INTO quiz_bundles 
-            (title, target_db_name, creator, description, image_data, image_type, quiz_mode, time_limit, use_time_limit, quiz_activate)
+            (title, target_db_name, creator, description, image_data, image_type, quiz_mode, time_limit, use_time_limit, quiz_activate, view_act)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
         `;
         
@@ -137,7 +138,7 @@ router.get('/list-quizzes', async (req, res) => {
     try {
         await client.connect();
         const result = await client.query(`
-            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode, quiz_activate
+            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode, quiz_activate, view_act
             FROM quiz_bundles 
             ORDER BY created_at DESC
         `);
