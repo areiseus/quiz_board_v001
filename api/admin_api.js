@@ -53,15 +53,74 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
-        // (2) 퀴즈 묶음 정보 삽입
+
+// 2. 퀴즈 생성 (시간 설정 저장 기능 추가됨 ✨)
+router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
+    const client = getClient();
+    try {
+        // [수정 포인트 1] 요청에서 timeLimit, useTimeLimit 값 받아오기
+        const { 
+            title, dbName, creator, description, quizData, 
+            quizMode = 'input', 
+            timeLimit, 
+            useTimeLimit 
+        } = req.body;
+
+        const imageFile = req.file;
+        const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
+
+        if (!safeDbName) throw new Error("DB 이름이 잘못되었습니다.");
+
+        // [수정 포인트 2] 데이터 타입 정리 (숫자형, 불린형 변환)
+        // 값이 없으면 기본값 20초, 사용안함(false) 등으로 처리
+        const safeTimeLimit = timeLimit ? parseInt(timeLimit, 10) : 20; 
+        const safeUseTimeLimit = (String(useTimeLimit) === 'true');
+
+        await client.connect();
+        await client.query('BEGIN');
+
+        // (1) 메인 테이블 생성 (DB는 완벽하니 IF NOT EXISTS로 안전장치만!)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS quiz_bundles (
+                uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+                title text NOT NULL,
+                target_db_name text NOT NULL UNIQUE, 
+                creator text,
+                description text,
+                image_data bytea,
+                image_type text,
+                quiz_mode text DEFAULT 'input',
+                time_limit int DEFAULT 20,
+                use_time_limit boolean DEFAULT true,
+                quiz_activate boolean DEFAULT false,
+                created_at timestamptz DEFAULT now()
+            )
+        `);
+
+        // (2) 퀴즈 묶음 정보 삽입 
+        // [수정 포인트 3] time_limit, use_time_limit, quiz_activate 컬럼 추가!
         const insertQuery = `
             INSERT INTO quiz_bundles 
-            (title, target_db_name, creator, description, image_data, image_type, quiz_mode )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, false)
+            (title, target_db_name, creator, description, image_data, image_type, quiz_mode, time_limit, use_time_limit, quiz_activate)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
         `;
-        const insertParams = [title, safeDbName, creator, description, imageFile ? imageFile.buffer : null, imageFile ? imageFile.mimetype : null, quizMode];
+        
+        // [수정 포인트 4] 파라미터($1 ~ $9) 순서대로 맵핑
+        const insertParams = [
+            title, 
+            safeDbName, 
+            creator, 
+            description, 
+            imageFile ? imageFile.buffer : null, 
+            imageFile ? imageFile.mimetype : null, 
+            quizMode,
+            safeTimeLimit,    // $8 time_limit 값
+            safeUseTimeLimit  // $9 use_time_limit 값
+        ];
 
-       // (3) 개별 퀴즈 테이블 생성
+        await client.query(insertQuery, insertParams);
+
+        // (3) 개별 퀴즈 테이블 생성
         await client.query(`DROP TABLE IF EXISTS ${safeDbName}`);
         await client.query(`
             CREATE TABLE ${safeDbName} (
@@ -99,6 +158,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         await client.end();
     }
 });
+
 
 // 3. 목록 불러오기 (원본 유지)
 router.get('/list-quizzes', async (req, res) => {
