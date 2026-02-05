@@ -29,7 +29,7 @@ router.post('/verify-password', (req, res) => {
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
     try {
-        const { title, dbName, creator, description, quizData, quizMode = 'input' } = req.body;
+        const { title, dbName, creator, description, quizData, quizMode } = req.body;
         const imageFile = req.file;
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
 
@@ -48,7 +48,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 description text,
                 image_data bytea,
                 image_type text,
-                quiz_mode text DEFAULT 'input',
+                quiz_mode boolean DEFAULT true,
                 created_at timestamptz DEFAULT now()
             )
         `);
@@ -61,7 +61,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         // [수정 포인트 1] 요청에서 timeLimit, useTimeLimit 값 받아오기
         const { 
             title, dbName, creator, description, quizData, 
-            quizMode = 'input', 
+            quizMode, 
             timeLimit, 
             useTimeLimit 
         } = req.body;
@@ -89,7 +89,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 description text,
                 image_data bytea,
                 image_type text,
-                quiz_mode text DEFAULT 'input',
+                quiz_mode boolean DEFAULT true,
                 time_limit int DEFAULT 20,
                 use_time_limit boolean DEFAULT true,
                 quiz_activate boolean DEFAULT false,
