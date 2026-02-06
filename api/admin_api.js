@@ -48,7 +48,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
 
         if (req.file) {
             thumbnailBuffer = await sharp(req.file.buffer)
-                .resize({ width: 800, withoutEnlargement: true }) 
+                .resize({ width: 480, withoutEnlargement: true }) 
                 .toFormat('webp', { quality: 85 }) 
                 .toBuffer();
             console.log(`[썸네일 생성] ${req.file.size} -> ${thumbnailBuffer.length} bytes`);
@@ -205,8 +205,8 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
         const thumbnailFile = req.files.find(f => f.fieldname === 'thumbnail');
         if (thumbnailFile) {
             const resizedThumb = await sharp(thumbnailFile.buffer)
-                .resize({ width: 800, withoutEnlargement: true })
-                .toFormat('webp', { quality: 85 }) 
+                .resize({ width: 480, withoutEnlargement: true })
+                .toFormat('webp', { quality: 100 }) 
                 .toBuffer();
             
             await client.query(`
@@ -230,7 +230,7 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
                 params = [q.question, q.answer, q.explanation, q.required_count, isStrict, q.id];
             } else if (newFile) {
                 const resizedImage = await sharp(newFile.buffer)
-                    .resize({ width: 1440, withoutEnlargement: true })
+                    .resize({ width: 1280, withoutEnlargement: true })
                     .toFormat('webp', { quality: 85 })
                     .toBuffer();
                 
