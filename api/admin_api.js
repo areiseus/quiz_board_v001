@@ -10,12 +10,18 @@ const upload = multer({
     limits: { fileSize: 30 * 1024 * 1024 } 
 });
 
-const getClient = () => {
-    return new Client({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
-    });
-};
+
+// ★ [핵심 변경] 매번 연결하지 말고, 미리 만들어둔 수영장(Pool)을 쓰자!
+// (이 코드가 router.get 안에 있으면 안 되고, 이렇게 바깥에 있어야 해!)
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    max: 20, // 최대 연결 수 (동시 접속자가 많아도 버팀)
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+});
+
+
 
 // 1. 관리자 비밀번호 검증
 router.post('/verify-password', (req, res) => {
@@ -271,17 +277,14 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
 // 6. [NEW] 썸네일 전용 API (이게 있어서 미리보기가 가능해짐!)
 // ==========================================================
 router.get('/thumbnail', async (req, res) => {
-    const client = getClient();
     const { dbName } = req.query;
-
     if (!dbName) return res.status(404).send('No DB Name');
 
     try {
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
-        await client.connect();
-
-        // 썸네일 데이터만 쏙 꺼내오기
-        const result = await client.query(`
+        
+        // ★ [변경 1] client.connect() 없이 바로 pool 사용 (엄청 빠름)
+        const result = await pool.query(`
             SELECT image_data, image_type 
             FROM quiz_bundles 
             WHERE target_db_name = $1
@@ -289,7 +292,11 @@ router.get('/thumbnail', async (req, res) => {
 
         if (result.rows.length > 0 && result.rows[0].image_data) {
             const row = result.rows[0];
-            // 브라우저에게 "이건 이미지야!"라고 알려주고 데이터 쏘기
+            
+            // ★ [변경 2] 브라우저 캐싱 적용! (이게 대박임)
+            // "야 브라우저야, 이 이미지는 1년(31536000초) 동안 안 바뀌니까 또 요청하지 말고 저장해놔!"
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            
             res.writeHead(200, {
                 'Content-Type': row.image_type || 'image/webp',
                 'Content-Length': row.image_data.length
@@ -301,9 +308,8 @@ router.get('/thumbnail', async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).send(e.message);
-    } finally {
-        await client.end();
-    }
+    } 
+    // ★ pool은 닫지 않아! (계속 재사용)
 });
 
 // 7. 퀴즈 설정값 가져오기 (게임 시작 전용)
