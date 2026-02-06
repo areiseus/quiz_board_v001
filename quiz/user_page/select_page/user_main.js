@@ -34,6 +34,7 @@ async function loadQuizList() {
             card.onclick = () => {
                 const title = encodeURIComponent(quiz.title);
                 const creator = encodeURIComponent(quiz.creator || '관리자');
+                const desc = encodeURIComponent(quiz.description || '');
                 location.href = `../quiz_page/quiz_main.html?db=${quiz.target_db_name}&title=${title}&creator=${creator}`;
             };
 
