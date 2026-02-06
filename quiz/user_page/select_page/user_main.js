@@ -42,14 +42,7 @@ async function loadQuizList() {
             const dateStr = dateObj.toLocaleDateString();
 
             // 이미지 처리
-            let imageHtml = '';
-            if (quiz.thumbnail) {
-                imageHtml = `<img src="${quiz.thumbnail}" style="width:100%; height:100%; object-fit:cover;" alt="표지">`;
-            } else {
-                imageHtml = `<div style="display:flex; align-items:center; justify-content:center; height:100%; background:#eee; color:#aaa; font-size:2rem; font-weight:bold;">
-                    ${quiz.title.substring(0, 1)}
-                </div>`;
-            }
+            const imageUrl = `/api/admin_api/thumbnail?dbName=${quiz.target_db_name}`;            
 
             card.innerHTML = `
                 <div style="height:150px; background:#f9f9f9; overflow:hidden;">
