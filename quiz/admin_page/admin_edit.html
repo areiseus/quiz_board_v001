@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>퀴즈 내용 수정</title>
-    <link rel="stylesheet" href="admin_style.css">
+    <link rel="stylesheet" href="admin_style.css"> 
     <style>
         /* [기본 레이아웃 스타일] */
+        body { margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; background-color: #f4f6f8; }
         .container { width: 1200px; max-width: 95%; margin: 0 auto; padding-bottom: 100px; /* 버튼 가림 방지 여백 */ }
         .edit-layout { display: flex; gap: 20px; margin-top: 20px; }
         
@@ -19,6 +20,7 @@
             height: 80vh; 
             overflow-y: auto; 
             border: 1px solid #ddd; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
         /* 메인 에디터 */
@@ -29,24 +31,14 @@
             border-radius: 10px; 
             border: 1px solid #ddd; 
             min-height: 80vh; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        
-
-
-        
         /* 퀴즈 목록 아이템 */
-        .quiz-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; }
+        .quiz-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; border-radius: 5px; }
         .quiz-item:hover { background: #f0f8ff; }
         .quiz-item.active { background: #e7f1ff; border-left: 4px solid #007bff; font-weight: bold; }
         
-        /* 개별 문제 카드 */
-        .q-card { background: #f9f9f9; border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
-        .row-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        .row-group input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        
-        .img-control { background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.9rem; }
-
         /* [추가됨] 둥둥 떠다니는 버튼 (플로팅 메뉴) */
         .floating-menu {
             position: fixed;   /* 화면에 고정 */
@@ -62,13 +54,14 @@
             background-color: #007bff;
             color: white;
             border: none;
-            padding: 15px 25px;
+            padding: 15px 30px;
             border-radius: 50px;
             font-size: 1.1rem;
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             transition: transform 0.2s;
+            display: flex; align-items: center; gap: 5px;
         }
 
         /* 취소 버튼 (회색) */
@@ -76,7 +69,7 @@
             background-color: #6c757d;
             color: white;
             border: none;
-            padding: 15px 25px;
+            padding: 15px 20px;
             border-radius: 50px;
             font-size: 1.1rem;
             font-weight: bold;
@@ -92,34 +85,31 @@
     </style>
 </head>
 <body>
-    <div class="form-group">
-        <label>썸네일 이미지 (변경하려면 선택)</label>
-    
-        <div style="margin-bottom: 10px;">
-            <img id="current-thumbnail" src="" alt="현재 썸네일" 
-                 style="max-width: 200px; border-radius: 8px; border: 1px solid #ddd; display: none;">
-        </div>
-            <input type="file" id="thumbnail-input" accept="image/*">
-    </div>
-    
+
     <div class="container">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h1>✏️ 퀴즈 상세 수정</h1>
-            <button onclick="location.href='admin_main.html'" style="padding:10px; cursor:pointer;">🔙 생성 페이지로</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 20px;">
+            <h1 style="margin:0;">✏️ 퀴즈 상세 수정</h1>
+            <button onclick="location.href='admin_main.html'" 
+                    style="padding:10px 20px; cursor:pointer; background:white; border:1px solid #ccc; border-radius:5px;">
+                🔙 생성 페이지로
+            </button>
         </div>
 
         <div class="edit-layout">
             <div class="sidebar">
-                <h3>📂 퀴즈 목록</h3>
-                <div id="quiz-list-container">로딩 중...</div>
+                <h3 style="margin-top:0; border-bottom:2px solid #eee; padding-bottom:10px;">📂 퀴즈 목록</h3>
+                <div id="quiz-list-container">
+                    <div style="text-align:center; padding:20px; color:#aaa;">로딩 중...</div>
+                </div>
             </div>
 
-            
             <div class="main-editor">
-                <h2 id="current-quiz-title">👈 왼쪽에서 수정할 퀴즈를 선택하세요</h2>
+                <h2 id="current-quiz-title" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-top:0;">
+                    👈 왼쪽에서 수정할 퀴즈를 선택하세요
+                </h2>
+                
                 <div id="editor-area" style="display:none;">
                     <div id="questions-container"></div>
-                    <div style="height: 50px;"></div> 
                 </div>
             </div>
         </div>
@@ -127,14 +117,14 @@
 
     <div class="floating-menu">
         <button class="float-btn-cancel" onclick="cancelEdit()">❌ 취소</button>
-        <button class="float-btn-save" onclick="saveChanges()">💾 저장하기</button>
+        <button class="float-btn-save" onclick="saveChanges()">💾 수정사항 저장</button>
     </div>
 
     <script src="admin_edit.js"></script>
     <script>
         // 취소 버튼 기능 (새로고침)
         function cancelEdit() {
-            if(confirm("수정사항을 취소하고 원래대로 되돌리시겠습니까?")) {
+            if(confirm("수정사항을 저장하지 않고 취소하시겠습니까?\n(작업 중인 내용은 사라집니다)")) {
                 location.reload(); 
             }
         }
