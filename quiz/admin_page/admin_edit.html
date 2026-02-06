@@ -30,6 +30,10 @@
             border: 1px solid #ddd; 
             min-height: 80vh; 
         }
+
+        
+
+
         
         /* 퀴즈 목록 아이템 */
         .quiz-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; }
@@ -88,6 +92,16 @@
     </style>
 </head>
 <body>
+    <div class="form-group">
+        <label>썸네일 이미지 (변경하려면 선택)</label>
+    
+        <div style="margin-bottom: 10px;">
+            <img id="current-thumbnail" src="" alt="현재 썸네일" 
+                 style="max-width: 200px; border-radius: 8px; border: 1px solid #ddd; display: none;">
+        </div>
+            <input type="file" id="thumbnail-input" accept="image/*">
+    </div>
+    
     <div class="container">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <h1>✏️ 퀴즈 상세 수정</h1>
@@ -100,6 +114,7 @@
                 <div id="quiz-list-container">로딩 중...</div>
             </div>
 
+            
             <div class="main-editor">
                 <h2 id="current-quiz-title">👈 왼쪽에서 수정할 퀴즈를 선택하세요</h2>
                 <div id="editor-area" style="display:none;">
