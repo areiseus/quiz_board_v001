@@ -14,40 +14,47 @@ async function loadQuizList() {
         container.innerHTML = ''; 
 
         if (!quizzes || quizzes.length === 0) {
-            container.innerHTML = '<p>등록된 퀴즈가 없습니다.</p>';
+            container.innerHTML = '<p style="padding:20px; text-align:center; color:#666;">등록된 퀴즈가 없습니다.</p>';
             return;
         }
 
         quizzes.forEach(quiz => {
-        // view_act가 false면 아예 화면에 그리지 않고 스킵합니다.
-        if (quiz.view_act === false) {
-            return; 
-        }
+            // view_act가 false면 건너뛰기
+            if (quiz.view_act === false) {
+                return; 
+            }
 
-
-            
-            
             const card = document.createElement('div');
             card.className = 'quiz-card';
             
-            // 기본 클릭 이벤트 (활성화 상태일 때만 동작하도록 나중에 덮어씌워짐)
+            // 클릭 이벤트 (상세 페이지 이동)
             card.onclick = () => {
                 const title = encodeURIComponent(quiz.title);
                 const creator = encodeURIComponent(quiz.creator || '관리자');
-                const desc = encodeURIComponent(quiz.description || '');
+                const desc = encodeURIComponent(quiz.description || ''); // 설명도 같이 전달!
                 location.href = `../quiz_page/quiz_main.html?db=${quiz.target_db_name}&title=${title}&creator=${creator}&description=${desc}`;
             };
 
             const dateObj = quiz.created_at ? new Date(quiz.created_at) : new Date();
             const dateStr = dateObj.toLocaleDateString();
 
-            // 이미지 처리
-            const imageUrl = `/api/admin_api/thumbnail?dbName=${quiz.target_db_name}`;
-
-// ▼▼▼ img 태그 안에 loading="lazy" 추가! ▼▼▼
-            const imageHtml = `<img src="${imageUrl}" 
-                loading="lazy"  onerror="this.parentNode.innerHTML='...'" 
-                style="width:100%; height:100%; object-fit:cover;" alt="표지">`;
+            // ★ [핵심 수정] image_type이 있을 때만 <img> 태그 생성 (없으면 바로 회색 박스)
+            let imageHtml = '';
+            
+            if (quiz.image_type) {
+                // 이미지가 있는 경우: Lazy Loading 적용된 img 태그
+                const imageUrl = `/api/admin_api/thumbnail?dbName=${quiz.target_db_name}`;
+                // 혹시라도 로딩 실패하면(onerror) 회색박스로 대체하는 안전장치 포함
+                imageHtml = `<img src="${imageUrl}" 
+                    loading="lazy" 
+                    onerror="this.parentNode.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;background:#eee;color:#aaa;font-weight:bold;font-size:2rem;\\'>${quiz.title.substring(0,1)}</div>'"
+                    style="width:100%; height:100%; object-fit:cover;" alt="표지">`;
+            } else {
+                // 이미지가 없는 경우: 아예 처음부터 깔끔한 회색 박스 렌더링
+                imageHtml = `<div style="display:flex; align-items:center; justify-content:center; height:100%; background:#eee; color:#aaa; font-size:2rem; font-weight:bold;">
+                    ${quiz.title.substring(0, 1)}
+                </div>`;
+            }
 
             card.innerHTML = `
                 <div style="height:150px; background:#f9f9f9; overflow:hidden;">
@@ -62,36 +69,27 @@ async function loadQuizList() {
                 </div>
             `;
 
-            // ▼▼▼ [수정된 부분] 비활성화(준비중) 처리 로직 ▼▼▼
-            // (변수명을 item -> quiz 로 변경했습니다)
+            // [비활성화(준비중) 처리 로직]
             if (quiz.quiz_activate === false) {
-                // 1. 반투명 회색 처리
                 card.style.opacity = '0.6';
                 card.style.filter = 'grayscale(100%)';
                 card.style.backgroundColor = '#e0e0e0'; 
-
-                // 2. 클릭 방지 (CSS)
                 card.style.pointerEvents = 'none';
                 card.style.cursor = 'default';
 
-                // 3. 제목에 [준비중] 태그 추가
-                // (위 HTML에서 class="card-title"을 썼으므로 맞춰줍니다)
                 const titleEl = card.querySelector('.card-title'); 
                 if (titleEl) {
                     titleEl.innerText = "[준비중] " + titleEl.innerText;
                     titleEl.style.color = "#555";
                 }
-
-                // 4. 클릭 이벤트 제거 (확실하게 null 처리)
                 card.onclick = null;
             }
-            // ▲▲▲ [수정 끝] ▲▲▲
             
             container.appendChild(card);
         });
 
     } catch (error) {
         console.error(error);
-        container.innerHTML = `<p style="color:red; font-weight:bold;">⚠️ 목록 로드 실패</p>`;
+        container.innerHTML = `<p style="color:red; font-weight:bold; padding:20px;">⚠️ 목록 로드 실패</p>`;
     }
 }
