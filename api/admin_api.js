@@ -138,7 +138,7 @@ router.get('/list-quizzes', async (req, res) => {
     try {
         await client.connect();
         const result = await client.query(`
-            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode, quiz_activate, view_act, description
+            SELECT uid, title, target_db_name, creator, description, created_at, image_data, image_type, quiz_mode, quiz_activate, view_act
             FROM quiz_bundles 
             ORDER BY created_at DESC
         `);
@@ -195,7 +195,7 @@ router.get('/get-quiz-detail', async (req, res) => {
 
         // [로그] 데이터 조회
         const query = `
-            SELECT id, quiz_no, question, answer, explanation, required_count, is_strict, image_url, image_type, image_data 
+            SELECT id, quiz_no, question, answer, explanation, required_count, is_strict, image_url, image_type, image_data,, description
             FROM ${safeDbName} 
             ORDER BY quiz_no ASC
         `;
