@@ -43,8 +43,10 @@ async function loadQuizList() {
 
             // 이미지 처리
             const imageUrl = `/api/admin_api/thumbnail?dbName=${quiz.target_db_name}`;
+
+// ▼▼▼ img 태그 안에 loading="lazy" 추가! ▼▼▼
             const imageHtml = `<img src="${imageUrl}" 
-                onerror="this.parentNode.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-weight:bold;\\'>${quiz.title.substring(0,1)}</div>'" 
+                loading="lazy"  onerror="this.parentNode.innerHTML='...'" 
                 style="width:100%; height:100%; object-fit:cover;" alt="표지">`;
 
             card.innerHTML = `
