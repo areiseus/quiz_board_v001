@@ -49,8 +49,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const sRes = await fetch(`/api/admin_api/get-quiz-quiz_bundles?dbName=${dbName}`);
             if (sRes.ok) {
                 const quiz_bundles = await sRes.json();
-
-
                 
                 // 시간 설정
                 if (quiz_bundles.time_limit) timeLimit = parseInt(quiz_bundles.time_limit);
