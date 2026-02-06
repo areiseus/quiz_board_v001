@@ -42,6 +42,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const sRes = await fetch(`/api/admin_api/get-quiz-quiz_bundles?dbName=${dbName}`);
             if (sRes.ok) {
                 const quiz_bundles = await sRes.json();
+
+                // HTML에 id="intro-description" 인 태그가 있다고 가정할게!
+                const descEl = document.getElementById('intro-description'); 
+                if (descEl) {
+                    descEl.innerText = quiz_bundles.description || ""; // 내용 없으면 빈칸
+                }
                 
                 // 시간 설정
                 if (quiz_bundles.time_limit) timeLimit = parseInt(quiz_bundles.time_limit);
