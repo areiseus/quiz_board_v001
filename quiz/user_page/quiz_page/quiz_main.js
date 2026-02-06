@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const dbName = params.get('db');
     const title = params.get('title') || "퀴즈 제목";
     const creator = params.get('creator') || "알 수 없음";
+    const description = params.get('description') || "";
 
     if (!dbName) {
         alert("잘못된 접근입니다. (DB 정보 없음)");
@@ -23,8 +24,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // UI 초기화
+
     document.getElementById('intro-title').innerText = title;
     document.getElementById('intro-creator').innerText = `Created by ${creator}`;
+    
+    const descEl = document.getElementById('intro-description');
+    if (descEl) {
+        descEl.innerText = description;
+    }
     
     const startBtn = document.querySelector('.btn-start');
     const loadStatus = document.getElementById('loading-status');
@@ -43,11 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (sRes.ok) {
                 const quiz_bundles = await sRes.json();
 
-                // HTML에 id="intro-description" 인 태그가 있다고 가정할게!
-                const descEl = document.getElementById('intro-description'); 
-                if (descEl) {
-                    descEl.innerText = quiz_bundles.description || ""; // 내용 없으면 빈칸
-                }
+
                 
                 // 시간 설정
                 if (quiz_bundles.time_limit) timeLimit = parseInt(quiz_bundles.time_limit);
