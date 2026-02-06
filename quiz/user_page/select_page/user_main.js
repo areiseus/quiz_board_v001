@@ -42,7 +42,10 @@ async function loadQuizList() {
             const dateStr = dateObj.toLocaleDateString();
 
             // 이미지 처리
-            const imageUrl = `/api/admin_api/thumbnail?dbName=${quiz.target_db_name}`;            
+            const imageUrl = `/api/admin_api/thumbnail?dbName=${quiz.target_db_name}`;
+            const imageHtml = `<img src="${imageUrl}" 
+                onerror="this.parentNode.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-weight:bold;\\'>${quiz.title.substring(0,1)}</div>'" 
+                style="width:100%; height:100%; object-fit:cover;" alt="표지">`;
 
             card.innerHTML = `
                 <div style="height:150px; background:#f9f9f9; overflow:hidden;">
