@@ -195,7 +195,7 @@ router.get('/get-quiz-detail', async (req, res) => {
 
         // [로그] 데이터 조회
         const query = `
-            SELECT id, quiz_no, question, answer, explanation, required_count, is_strict, image_url, image_type, image_data,, description
+            SELECT id, quiz_no, question, answer, explanation, required_count, is_strict, image_url, image_type, image_data
             FROM ${safeDbName} 
             ORDER BY quiz_no ASC
         `;
@@ -288,7 +288,7 @@ router.get('/get-quiz-quiz_bundles', async (req, res) => {
         
         // ▼▼▼ [수정 1] SELECT 뒤에 'description'을 꼭 추가해 줘! ▼▼▼
         const result = await client.query(`
-            SELECT quiz_mode, time_limit, use_time_limit, description
+            SELECT quiz_mode, time_limit, use_time_limit
             FROM quiz_bundles
             WHERE target_db_name = $1
         `, [dbName]);
@@ -301,7 +301,7 @@ router.get('/get-quiz-quiz_bundles', async (req, res) => {
                 quiz_mode: row.quiz_mode,
                 time_limit: row.time_limit,
                 use_time_limit: row.use_time_limit,
-                description: row.description // <--- 이거 추가!
+                 // <--- 이거 추가!
             });
         } else {
             res.status(404).json({ error: "quiz_bundles DB not found" });
