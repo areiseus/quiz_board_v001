@@ -138,7 +138,7 @@ router.get('/list-quizzes', async (req, res) => {
     try {
         await client.connect();
         const result = await client.query(`
-            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode, quiz_activate, view_act
+            SELECT uid, title, target_db_name, creator, created_at, image_data, image_type, quiz_mode, quiz_activate, view_act, description
             FROM quiz_bundles 
             ORDER BY created_at DESC
         `);
