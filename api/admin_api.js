@@ -283,12 +283,12 @@ router.get('/get-quiz-quiz_bundles', async (req, res) => {
     
     if (!dbName) return res.status(400).json({ error: "No DB Name" });
 
-    try {
+   try {
         await client.connect();
         
-        // quiz_bundles 테이블에서 설정값(시간, 모드 등)을 조회합니다.
+        // ▼▼▼ [수정 1] SELECT 뒤에 'description'을 꼭 추가해 줘! ▼▼▼
         const result = await client.query(`
-            SELECT quiz_mode, time_limit, use_time_limit
+            SELECT quiz_mode, time_limit, use_time_limit, description
             FROM quiz_bundles
             WHERE target_db_name = $1
         `, [dbName]);
@@ -296,11 +296,12 @@ router.get('/get-quiz-quiz_bundles', async (req, res) => {
         if (result.rows.length > 0) {
             const row = result.rows[0];
             
-            // DB에 있는 값을 그대로 클라이언트에 보냅니다.
+            // ▼▼▼ [수정 2] 클라이언트로 보낼 때 description도 같이 포장! ▼▼▼
             res.json({
                 quiz_mode: row.quiz_mode,
-                time_limit: row.time_limit,          // DB에 20이라고 있으면 20이 나갑니다.
-                use_time_limit: row.use_time_limit
+                time_limit: row.time_limit,
+                use_time_limit: row.use_time_limit,
+                description: row.description // <--- 이거 추가!
             });
         } else {
             res.status(404).json({ error: "quiz_bundles DB not found" });
