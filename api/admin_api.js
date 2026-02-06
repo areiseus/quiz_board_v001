@@ -1,14 +1,13 @@
 const express = require('express');
 const { Client } = require('pg');
 const multer = require('multer');
-const sharp = require('sharp');
+const sharp = require('sharp'); // 이미지 최적화 도구
 const router = express.Router();
 
-// ★ [수정 포인트] 용량 제한을 500MB로 대폭 상향! 
-// (사진 한 장에 500MB 넘는 건 세상에 거의 없으니 사실상 무제한이야!)
+// ★ [설정] 용량 제한 30MB (서버 안전 + 고화질 충분)
 const upload = multer({ 
     storage: multer.memoryStorage(),
-    limits: { fileSize: 30 * 1024 * 1024 } // 500MB (서버 안전을 위한 최소한의 안전벨트)
+    limits: { fileSize: 30 * 1024 * 1024 } 
 });
 
 const getClient = () => {
@@ -18,6 +17,7 @@ const getClient = () => {
     });
 };
 
+// 1. 관리자 비밀번호 검증
 router.post('/verify-password', (req, res) => {
     const { password } = req.body;
     if (password === process.env.ADMIN_PASSWORD) {
@@ -28,7 +28,7 @@ router.post('/verify-password', (req, res) => {
 });
 
 // ==========================================================
-// 2. 퀴즈 생성 (픽셀 제한 없음! 용량만 넉넉하게!)
+// 2. 퀴즈 생성 (WebP 변환 + 리사이징 ✨)
 // ==========================================================
 router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     const client = getClient();
@@ -38,9 +38,9 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             quizMode, timeLimit, useTimeLimit 
         } = req.body;
 
-        // ★ 썸네일: WebP 변환 + 800px (용량 최적화)
+        // [이미지 처리] 썸네일: WebP 변환 + 800px 리사이징
         let thumbnailBuffer = null;
-        let mimeType = 'image/webp'; 
+        let mimeType = 'image/webp'; // 무조건 WebP로 저장됨
 
         if (req.file) {
             thumbnailBuffer = await sharp(req.file.buffer)
@@ -48,12 +48,13 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
                 .toFormat('webp', { quality: 85 }) 
                 .toBuffer();
             
-            console.log(`[썸네일 변환] ${req.file.size} -> ${thumbnailBuffer.length} bytes`);
+            console.log(`[썸네일 생성] ${req.file.size} -> ${thumbnailBuffer.length} bytes`);
         }
 
         const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
         if (!safeDbName) throw new Error("DB 이름이 잘못되었습니다.");
 
+        // 데이터 타입 안전 변환
         const safeTimeLimit = timeLimit ? parseInt(timeLimit, 10) : 20; 
         const safeUseTimeLimit = (String(useTimeLimit) === 'true');
         const safeQuizMode = (String(quizMode) === 'true' || String(quizMode) === 'input');
@@ -61,6 +62,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
         await client.connect();
         await client.query('BEGIN');
 
+        // (1) 메인 테이블 생성
         await client.query(`
             CREATE TABLE IF NOT EXISTS quiz_bundles (
                 uid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -79,6 +81,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
+        // (2) 퀴즈 묶음 정보 삽입
         const insertQuery = `
             INSERT INTO quiz_bundles 
             (title, target_db_name, creator, description, image_data, image_type, quiz_mode, time_limit, use_time_limit, quiz_activate)
@@ -99,6 +102,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
 
         await client.query(insertQuery, insertParams);
 
+        // (3) 개별 퀴즈 테이블 생성
         await client.query(`DROP TABLE IF EXISTS ${safeDbName}`);
         await client.query(`
             CREATE TABLE ${safeDbName} (
@@ -115,6 +119,7 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
             )
         `);
 
+        // (4) 문제 데이터 삽입
         const quizzes = JSON.parse(quizData);
         for (const q of quizzes) {
             await client.query(
@@ -136,11 +141,14 @@ router.post('/create-quiz', upload.single('thumbnail'), async (req, res) => {
     }
 });
 
-// 3. 목록 불러오기 (이미지 데이터 제외 -> 로딩 속도 UP)
+// ==========================================================
+// 3. 목록 불러오기 (★ image_data 제거됨 -> 로딩 속도 10배 UP!)
+// ==========================================================
 router.get('/list-quizzes', async (req, res) => {
     const client = getClient();
     try {
         await client.connect();
+        // ★ 여기서 'image_data'를 뺐기 때문에 목록이 깃털처럼 가벼워짐!
         const result = await client.query(`
             SELECT uid, title, target_db_name, creator, description, created_at, 
             image_type, quiz_mode, quiz_activate, view_act
@@ -156,7 +164,7 @@ router.get('/list-quizzes', async (req, res) => {
     }
 });
 
-// 4. 상세 조회
+// 4. 상세 조회 (문제 풀 때 사용)
 router.get('/get-quiz-detail', async (req, res) => {
     const client = getClient();
     const { dbName } = req.query;
@@ -173,6 +181,7 @@ router.get('/get-quiz-detail', async (req, res) => {
         `;
         const result = await client.query(query);
 
+        // 상세 조회는 문제 이미지가 필요하므로 Base64로 변환해서 줌
         const questions = result.rows.map(row => {
             let convertedImage = null;
             if (row.image_data && row.image_type) {
@@ -191,7 +200,7 @@ router.get('/get-quiz-detail', async (req, res) => {
 });
 
 // ==========================================================
-// 5. 업데이트 (WebP + 리사이징 적용)
+// 5. 업데이트 (WebP + 리사이징 적용 ✨)
 // ==========================================================
 router.post('/update-quiz', upload.any(), async (req, res) => {
     const client = getClient();
@@ -253,6 +262,79 @@ router.post('/update-quiz', upload.any(), async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK');
         res.status(500).json({ error: error.message });
+    } finally {
+        await client.end();
+    }
+});
+
+// ==========================================================
+// 6. [NEW] 썸네일 전용 API (이게 있어서 미리보기가 가능해짐!)
+// ==========================================================
+router.get('/thumbnail', async (req, res) => {
+    const client = getClient();
+    const { dbName } = req.query;
+
+    if (!dbName) return res.status(404).send('No DB Name');
+
+    try {
+        const safeDbName = dbName.replace(/[^a-z0-9_]/g, '');
+        await client.connect();
+
+        // 썸네일 데이터만 쏙 꺼내오기
+        const result = await client.query(`
+            SELECT image_data, image_type 
+            FROM quiz_bundles 
+            WHERE target_db_name = $1
+        `, [safeDbName]);
+
+        if (result.rows.length > 0 && result.rows[0].image_data) {
+            const row = result.rows[0];
+            // 브라우저에게 "이건 이미지야!"라고 알려주고 데이터 쏘기
+            res.writeHead(200, {
+                'Content-Type': row.image_type || 'image/webp',
+                'Content-Length': row.image_data.length
+            });
+            res.end(row.image_data);
+        } else {
+            res.status(404).send('No Image');
+        }
+    } catch (e) {
+        console.error(e);
+        res.status(500).send(e.message);
+    } finally {
+        await client.end();
+    }
+});
+
+// 7. 퀴즈 설정값 가져오기 (게임 시작 전용)
+router.get('/get-quiz-quiz_bundles', async (req, res) => {
+    const client = getClient();
+    const { dbName } = req.query;
+    
+    if (!dbName) return res.status(400).json({ error: "No DB Name" });
+
+   try {
+        await client.connect();
+        const result = await client.query(`
+            SELECT quiz_mode, time_limit, use_time_limit, description 
+            FROM quiz_bundles
+            WHERE target_db_name = $1
+        `, [dbName]);
+
+        if (result.rows.length > 0) {
+            const row = result.rows[0];
+            res.json({
+                quiz_mode: row.quiz_mode,
+                time_limit: row.time_limit,
+                use_time_limit: row.use_time_limit,
+                description: row.description 
+            });
+        } else {
+            res.status(404).json({ error: "quiz_bundles DB not found" });
+        }
+    } catch (e) {
+        console.error("설정 로드 실패:", e.message);
+        res.json({});
     } finally {
         await client.end();
     }
